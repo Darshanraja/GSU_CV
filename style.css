@@ -1,0 +1,115 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --gsu-blue: #0039A6;
+  --gsu-blue-dark: #002B7A;
+  --cream: #F7F1E3;
+  --white: #FFFFFF;
+  --text: #1F2937;
+  --muted: #6B7280;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Arial, Helvetica, sans-serif;
+  background: linear-gradient(135deg, var(--cream), #ffffff);
+  color: var(--text);
+}
+
+.page-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.card {
+  width: min(720px, 100%);
+  background: var(--white);
+  border-radius: 20px;
+  padding: 42px 36px;
+  text-align: center;
+  box-shadow: 0 14px 40px rgba(0, 57, 166, 0.16);
+  border-top: 8px solid var(--gsu-blue);
+}
+
+.gsu-logo {
+  width: min(360px, 80%);
+  height: auto;
+  margin-bottom: 24px;
+}
+
+h1 {
+  margin: 0;
+  color: var(--gsu-blue);
+  font-size: clamp(2rem, 5vw, 3rem);
+}
+
+.subtitle {
+  margin: 10px 0 30px;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.module-box {
+  width: min(460px, 100%);
+  margin: 0 auto;
+}
+
+label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--gsu-blue-dark);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+select {
+  width: 100%;
+  padding: 14px 15px;
+  font-size: 1rem;
+  border: 2px solid #D1D5DB;
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--text);
+  outline: none;
+}
+
+select:focus {
+  border-color: var(--gsu-blue);
+}
+
+button {
+  width: 100%;
+  margin-top: 16px;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--gsu-blue);
+  color: var(--white);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--gsu-blue-dark);
+}
+
+.message {
+  min-height: 22px;
+  margin-top: 14px;
+  color: #B42318;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 600px) {
+  .card {
+    padding: 30px 20px;
+  }
+}
