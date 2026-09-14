@@ -22,6 +22,8 @@ pip install opencv-python==4.10.0.84 numpy==1.26.4
 
 Run the program:
 
+cd module2
+
 python finalweek1.py
 
 ## Step 1 - Camera Calibration
