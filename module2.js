@@ -1,4 +1,3 @@
-
 let stream = null;
 let selectedDeviceId = "";
 const CALIBRATION_MAX_WIDTH = 1280;
@@ -36,20 +35,20 @@ const OBJECTS = [
   { name: "Vitamin", width: 9.0, height: 10.5 },
   { name: "Cup", width: 7.0, height: 13.0 },
   { name: "Brownie", width: 9.0, height: 1.5 },
-  { name: "Egg cup", width: 5.0, height: 7.5 }
+  { name: "Egg cup", width: 5.0, height: 7.5 },
 ];
 
-const $ = id => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 
-document.querySelectorAll(".step-tab").forEach(btn => {
+document.querySelectorAll(".step-tab").forEach((btn) => {
   btn.addEventListener("click", () => showStep(btn.dataset.step));
 });
 
 function showStep(id) {
-  document.querySelectorAll(".step-tab").forEach(btn => {
+  document.querySelectorAll(".step-tab").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.step === id);
   });
-  document.querySelectorAll(".step-panel").forEach(panel => {
+  document.querySelectorAll(".step-panel").forEach((panel) => {
     panel.classList.toggle("active-panel", panel.id === id);
   });
 }
@@ -66,7 +65,7 @@ $("cameraSelect").addEventListener("change", async () => {
 async function loadCameraDevices() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
-    const cameras = devices.filter(d => d.kind === "videoinput");
+    const cameras = devices.filter((d) => d.kind === "videoinput");
     const select = $("cameraSelect");
     const previous = select.value;
     select.innerHTML = "";
@@ -78,7 +77,7 @@ async function loadCameraDevices() {
       select.appendChild(option);
     });
 
-    if (previous && [...select.options].some(o => o.value === previous)) {
+    if (previous && [...select.options].some((o) => o.value === previous)) {
       select.value = previous;
     }
 
@@ -94,7 +93,7 @@ async function startCamera() {
 
     const videoConstraints = {
       width: { ideal: 1920 },
-      height: { ideal: 1080 }
+      height: { ideal: 1080 },
     };
 
     const id = selectedDeviceId || $("cameraSelect").value;
@@ -102,7 +101,7 @@ async function startCamera() {
 
     stream = await navigator.mediaDevices.getUserMedia({
       video: videoConstraints,
-      audio: false
+      audio: false,
     });
 
     $("video").srcObject = stream;
@@ -118,7 +117,7 @@ async function startCamera() {
 
 function stopCamera() {
   if (stream) {
-    stream.getTracks().forEach(t => t.stop());
+    stream.getTracks().forEach((t) => t.stop());
     stream = null;
   }
   $("video").srcObject = null;
@@ -190,11 +189,19 @@ async function calibrateOnServer() {
         images: calibrationImages,
         checkerboard_cols: 9,
         checkerboard_rows: 6,
-        square_size_cm: parseFloat($("squareSize").value)
-      })
+        square_size_cm: parseFloat($("squareSize").value),
+      }),
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
+
+    let data;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      throw new Error("Server response: " + responseText);
+    }
 
     if (!response.ok) {
       throw new Error(data.detail || "Calibration failed.");
@@ -208,7 +215,7 @@ async function calibrateOnServer() {
       cy: data.cy,
       width: data.image_width,
       height: data.image_height,
-      distortion: data.distortion
+      distortion: data.distortion,
     };
 
     localStorage.setItem("module2Calibration", JSON.stringify(calibration));
@@ -232,7 +239,8 @@ function displayCalibration(validImages = "-") {
   $("fyValue").textContent = Number(calibration.fy).toFixed(2);
   $("cxValue").textContent = Number(calibration.cx).toFixed(2);
   $("cyValue").textContent = Number(calibration.cy).toFixed(2);
-  $("resolutionValue").textContent = `${calibration.width} × ${calibration.height}`;
+  $("resolutionValue").textContent =
+    `${calibration.width} × ${calibration.height}`;
   $("calibrationResults").classList.remove("hidden");
 }
 
@@ -252,8 +260,8 @@ function loadSavedCalibration() {
 function canvasPoint(event, canvas) {
   const rect = canvas.getBoundingClientRect();
   return {
-    x: (event.clientX - rect.left) * canvas.width / rect.width,
-    y: (event.clientY - rect.top) * canvas.height / rect.height
+    x: ((event.clientX - rect.left) * canvas.width) / rect.width,
+    y: ((event.clientY - rect.top) * canvas.height) / rect.height,
   };
 }
 
@@ -278,7 +286,8 @@ function drawPoints(canvas, points) {
   if (points.length > 1) {
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    for (let i = 1; i < points.length; i++)
+      ctx.lineTo(points[i].x, points[i].y);
     if (points.length === 4) ctx.closePath();
     ctx.stroke();
   }
@@ -292,7 +301,7 @@ function scaledIntrinsics(canvas) {
 
   return {
     fx: calibration.fx * sx,
-    fy: calibration.fy * sy
+    fy: calibration.fy * sy,
   };
 }
 
@@ -307,8 +316,8 @@ function calculateDimensions(points, z, canvas) {
   return {
     widthPixels,
     heightPixels,
-    widthCm: widthPixels * z / intr.fx * 100,
-    heightCm: heightPixels * z / intr.fy * 100
+    widthCm: ((widthPixels * z) / intr.fx) * 100,
+    heightCm: ((heightPixels * z) / intr.fy) * 100,
   };
 }
 
@@ -338,11 +347,12 @@ $("captureObjectBtn").addEventListener("click", () => {
   }
 });
 
-$("measurementCanvas").addEventListener("click", e => {
+$("measurementCanvas").addEventListener("click", (e) => {
   if (!measurementFrame || measurementPoints.length >= 4) return;
   measurementPoints.push(canvasPoint(e, $("measurementCanvas")));
   restoreCanvas($("measurementCanvas"), measurementFrame, measurementPoints);
-  $("measurementStatus").textContent = `${measurementPoints.length}/4 corners selected.`;
+  $("measurementStatus").textContent =
+    `${measurementPoints.length}/4 corners selected.`;
 });
 
 $("resetCornersBtn").addEventListener("click", () => {
@@ -368,7 +378,10 @@ $("calculateObjectBtn").addEventListener("click", () => {
 
 // STEP 3
 $("validationMode").addEventListener("change", () => {
-  $("manualFields").classList.toggle("hidden", $("validationMode").value !== "manual");
+  $("manualFields").classList.toggle(
+    "hidden",
+    $("validationMode").value !== "manual",
+  );
 });
 
 $("beginValidationBtn").addEventListener("click", () => {
@@ -413,7 +426,8 @@ function updateCurrentObject() {
       `<b>${validationIndex + 1}/20 - ${obj.name}</b><br>` +
       `Actual width: ${obj.width.toFixed(2)} cm | Actual height: ${obj.height.toFixed(2)} cm`;
   } else {
-    $("currentObject").textContent = "Enter object name and actual dimensions above.";
+    $("currentObject").textContent =
+      "Enter object name and actual dimensions above.";
   }
 }
 
@@ -440,11 +454,12 @@ $("captureValidationBtn").addEventListener("click", () => {
   }
 });
 
-$("validationCanvas").addEventListener("click", e => {
+$("validationCanvas").addEventListener("click", (e) => {
   if (!validationFrame || validationPoints.length >= 4) return;
   validationPoints.push(canvasPoint(e, $("validationCanvas")));
   restoreCanvas($("validationCanvas"), validationFrame, validationPoints);
-  $("validationStatus").textContent = `${validationPoints.length}/4 corners selected.`;
+  $("validationStatus").textContent =
+    `${validationPoints.length}/4 corners selected.`;
 });
 
 $("resetValidationCornersBtn").addEventListener("click", () => {
@@ -468,8 +483,8 @@ $("saveValidationBtn").addEventListener("click", () => {
     const heightError = est.heightCm - truth.height;
     const widthAbs = Math.abs(widthError);
     const heightAbs = Math.abs(heightError);
-    const widthPct = widthAbs / truth.width * 100;
-    const heightPct = heightAbs / truth.height * 100;
+    const widthPct = (widthAbs / truth.width) * 100;
+    const heightPct = (heightAbs / truth.height) * 100;
 
     const row = {
       measurement: validationResults.length + 1,
@@ -484,7 +499,7 @@ $("saveValidationBtn").addEventListener("click", () => {
       cameraHeight: est.heightCm,
       heightError,
       heightAbs,
-      heightPct
+      heightPct,
     };
 
     validationResults.push(row);
@@ -503,7 +518,7 @@ $("saveValidationBtn").addEventListener("click", () => {
     updateCurrentObject();
 
     $("validationStatus").textContent =
-      (validationIndex >= 20 && $("validationMode").value === "predefined")
+      validationIndex >= 20 && $("validationMode").value === "predefined"
         ? "All 20 measurements complete. Generate the report."
         : "Measurement saved. Continue with the next object.";
   } catch (err) {
@@ -534,33 +549,43 @@ $("clearValidationBtn").addEventListener("click", () => {
 });
 
 // REPORT
-function mean(a) { return a.reduce((x, y) => x + y, 0) / a.length; }
-function rmse(a) { return Math.sqrt(mean(a.map(v => v * v))); }
+function mean(a) {
+  return a.reduce((x, y) => x + y, 0) / a.length;
+}
+function rmse(a) {
+  return Math.sqrt(mean(a.map((v) => v * v)));
+}
 function std(a) {
   const m = mean(a);
-  return Math.sqrt(mean(a.map(v => (v - m) ** 2)));
+  return Math.sqrt(mean(a.map((v) => (v - m) ** 2)));
 }
 
 $("finishValidationBtn").addEventListener("click", generateReport);
 
 function generateReport() {
   if (!validationResults.length) {
-    $("validationStatus").textContent = "Complete validation measurements first.";
+    $("validationStatus").textContent =
+      "Complete validation measurements first.";
     return;
   }
 
-  const we = validationResults.map(r => r.widthError);
-  const he = validationResults.map(r => r.heightError);
-  const wa = validationResults.map(r => r.widthAbs);
-  const ha = validationResults.map(r => r.heightAbs);
-  const wp = validationResults.map(r => r.widthPct);
-  const hp = validationResults.map(r => r.heightPct);
+  const we = validationResults.map((r) => r.widthError);
+  const he = validationResults.map((r) => r.heightError);
+  const wa = validationResults.map((r) => r.widthAbs);
+  const ha = validationResults.map((r) => r.heightAbs);
+  const wp = validationResults.map((r) => r.widthPct);
+  const hp = validationResults.map((r) => r.heightPct);
 
-  const wMean = mean(we), hMean = mean(he);
-  const wMAE = mean(wa), hMAE = mean(ha);
-  const wRMSE = rmse(we), hRMSE = rmse(he);
-  const wMAPE = mean(wp), hMAPE = mean(hp);
-  const wStd = std(we), hStd = std(he);
+  const wMean = mean(we),
+    hMean = mean(he);
+  const wMAE = mean(wa),
+    hMAE = mean(ha);
+  const wRMSE = rmse(we),
+    hRMSE = rmse(he);
+  const wMAPE = mean(wp),
+    hMAPE = mean(hp);
+  const wStd = std(we),
+    hStd = std(he);
   const overall = (wMAPE + hMAPE) / 2;
 
   $("reportCount").textContent = validationResults.length;
@@ -585,7 +610,7 @@ function generateReport() {
   const tbody = $("reportTable").querySelector("tbody");
   tbody.innerHTML = "";
 
-  validationResults.forEach(r => {
+  validationResults.forEach((r) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${r.measurement}</td><td>${r.object}</td>
@@ -602,24 +627,49 @@ function generateReport() {
 $("downloadCsvBtn").addEventListener("click", () => {
   if (!validationResults.length) return;
 
-  const rows = [[
-    "measurement","object_name","distance_m",
-    "actual_width_cm","estimated_width_cm","width_error_cm",
-    "width_absolute_error_cm","width_percentage_error",
-    "actual_height_cm","estimated_height_cm","height_error_cm",
-    "height_absolute_error_cm","height_percentage_error"
-  ]];
+  const rows = [
+    [
+      "measurement",
+      "object_name",
+      "distance_m",
+      "actual_width_cm",
+      "estimated_width_cm",
+      "width_error_cm",
+      "width_absolute_error_cm",
+      "width_percentage_error",
+      "actual_height_cm",
+      "estimated_height_cm",
+      "height_error_cm",
+      "height_absolute_error_cm",
+      "height_percentage_error",
+    ],
+  ];
 
-  validationResults.forEach(r => rows.push([
-    r.measurement,r.object,r.distance,r.actualWidth,r.cameraWidth,r.widthError,
-    r.widthAbs,r.widthPct,r.actualHeight,r.cameraHeight,r.heightError,r.heightAbs,r.heightPct
-  ]));
+  validationResults.forEach((r) =>
+    rows.push([
+      r.measurement,
+      r.object,
+      r.distance,
+      r.actualWidth,
+      r.cameraWidth,
+      r.widthError,
+      r.widthAbs,
+      r.widthPct,
+      r.actualHeight,
+      r.cameraHeight,
+      r.heightError,
+      r.heightAbs,
+      r.heightPct,
+    ]),
+  );
 
-  const csv = rows.map(row =>
-    row.map(v => `"${String(v).replaceAll('"','""')}"`).join(",")
-  ).join("\n");
+  const csv = rows
+    .map((row) =>
+      row.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","),
+    )
+    .join("\n");
 
-  const blob = new Blob([csv], {type:"text/csv"});
+  const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
