@@ -2,172 +2,235 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Module 2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 2 | Computer Vision Assessment</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
 <header class="site-header">
   <div class="header-inner">
-    <img src="assets/gsu-logo.png" class="header-logo" alt="GSU">
-    <div><h1>Computer Vision Assessment</h1><p>CSc 8830 - Module 2</p></div>
+    <img src="assets/gsu-logo.png" class="header-logo" alt="Georgia State University">
+    <div>
+      <h1>Computer Vision Assessment</h1>
+      <p>CSc 8830 - Module 2</p>
+    </div>
     <a href="index.html" class="back-link">Back to Modules</a>
   </div>
 </header>
 
 <main class="module-container">
+
 <section class="cv-card">
-<h2>Module 2</h2>
-<p>Camera Calibration, Object Measurement, Validation and Statistical Report</p>
+  <h2>Module 2</h2>
+  <p>Camera Calibration, Object Measurement, Validation and Statistical Report</p>
 </section>
 
 <section class="cv-card">
-<h3>Camera Setup</h3>
-<select id="cameraSelect"><option value="">Start camera to load devices</option></select>
-<div class="button-row">
-<button id="startCameraBtn">Start Camera</button>
-<button id="refreshCamerasBtn">Refresh Cameras</button>
-<button id="stopCameraBtn">Stop Camera</button>
-</div>
-<p id="cameraStatus" class="status">Camera not started.</p>
-<div class="video-shell"><video id="video" autoplay playsinline muted></video></div>
+  <h3>Camera Setup</h3>
+
+  <div class="form-row">
+    <div class="field">
+      <label for="cameraSelect">Camera Source</label>
+      <select id="cameraSelect">
+        <option value="">Start camera to load devices</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="button-row">
+    <button id="startCameraBtn">Start Camera</button>
+    <button id="refreshCamerasBtn" class="secondary-btn">Refresh Cameras</button>
+    <button id="stopCameraBtn" class="danger-btn">Stop Camera</button>
+  </div>
+
+  <p id="cameraStatus" class="status">Camera not started.</p>
+
+  <div class="video-shell">
+    <video id="video" autoplay playsinline muted></video>
+  </div>
 </section>
 
 <nav class="step-nav">
-<button class="step-tab active" data-step="step1">Step 1<br><span>Calibration</span></button>
-<button class="step-tab" data-step="step2">Step 2<br><span>Measurement</span></button>
-<button class="step-tab" data-step="step3">Step 3<br><span>Validation</span></button>
-<button class="step-tab" data-step="report">Final<br><span>Report</span></button>
+  <button class="step-tab active" data-step="step1">Step 1<br><span>Calibration</span></button>
+  <button class="step-tab" data-step="step2">Step 2<br><span>Measurement</span></button>
+  <button class="step-tab" data-step="step3">Step 3<br><span>Validation</span></button>
+  <button class="step-tab" data-step="report">Final<br><span>Report</span></button>
 </nav>
 
 <section id="step1" class="step-panel active-panel cv-card">
-<h3>Step 1 - Camera Calibration</h3>
-<p class="info-box">
-Run <b>module2/finalweek1.py</b> for the real OpenCV checkerboard calibration.
-Enter the calibration values printed by Python below. They are saved in this browser
-and used by Steps 2 and 3.
-</p>
-<div class="grid">
-<label>fx<input id="fxInput" type="number" step="0.0001"></label>
-<label>fy<input id="fyInput" type="number" step="0.0001"></label>
-<label>cx<input id="cxInput" type="number" step="0.0001"></label>
-<label>cy<input id="cyInput" type="number" step="0.0001"></label>
-<label>Calibration Width<input id="calWidthInput" type="number" value="1920"></label>
-<label>Calibration Height<input id="calHeightInput" type="number" value="1080"></label>
-<label>RMS (optional)<input id="rmsInput" type="number" step="0.0001"></label>
-</div>
-<div class="button-row">
-<button id="saveCalibrationBtn">Save Calibration</button>
-<button id="clearCalibrationBtn">Clear Calibration</button>
-</div>
-<p id="calibrationStatus" class="status">Enter calibration values from Python.</p>
-<div id="calibrationResults" class="results-box hidden">
-<div class="grid">
-<div>fx: <b id="fxValue"></b></div><div>fy: <b id="fyValue"></b></div>
-<div>cx: <b id="cxValue"></b></div><div>cy: <b id="cyValue"></b></div>
-<div>Resolution: <b id="resolutionValue"></b></div><div>RMS: <b id="rmsValue"></b></div>
-</div>
-</div>
+  <h3>Step 1 - Camera Calibration</h3>
+
+  <div class="info-box">
+    Camera calibration was completed using OpenCV with the 9 × 6 inner-corner checkerboard.
+    The saved calibration result is loaded automatically by this webpage.
+  </div>
+
+  <p id="calibrationStatus" class="status">Loading saved calibration...</p>
+
+  <div id="calibrationResults" class="results-box hidden">
+    <h4>Calibration Complete ✓</h4>
+
+    <div class="stats-grid">
+      <div><span>fx</span><strong id="fxValue">-</strong></div>
+      <div><span>fy</span><strong id="fyValue">-</strong></div>
+      <div><span>cx</span><strong id="cxValue">-</strong></div>
+      <div><span>cy</span><strong id="cyValue">-</strong></div>
+      <div><span>Resolution</span><strong id="resolutionValue">-</strong></div>
+      <div><span>Calibration Source</span><strong>OpenCV</strong></div>
+    </div>
+
+    <div class="button-row">
+      <button id="continueStep2Btn" class="success-btn">Continue to Step 2</button>
+    </div>
+  </div>
 </section>
 
 <section id="step2" class="step-panel cv-card">
-<h3>Step 2 - Object Measurement</h3>
-<label>Camera-to-object distance (m)<input id="step2Distance" type="number" value="1.00" step="0.01"></label>
-<p>Capture the object and click: Top-left → Top-right → Bottom-right → Bottom-left.</p>
-<div class="button-row">
-<button id="captureObjectBtn">Capture Object</button>
-<button id="resetCornersBtn">Reset Corners</button>
-<button id="calculateObjectBtn">Calculate Width & Height</button>
-</div>
-<p id="measurementStatus" class="status">Capture an object image to begin.</p>
-<div class="canvas-shell"><canvas id="measurementCanvas"></canvas></div>
-<div id="measurementResults" class="results-box hidden">
-<div class="grid">
-<div>Width in Image: <b id="pixelWidthResult"></b></div>
-<div>Height in Image: <b id="pixelHeightResult"></b></div>
-<div>Estimated Width: <b id="widthResult"></b></div>
-<div>Estimated Height: <b id="heightResult"></b></div>
-</div>
-</div>
+  <h3>Step 2 - Object Width and Height Measurement</h3>
+
+  <div class="field small-field">
+    <label for="step2Distance">Camera-to-object distance (meters)</label>
+    <input id="step2Distance" type="number" value="1.00" step="0.01" min="0.01">
+  </div>
+
+  <p>Capture the object and click the four corners in this order:</p>
+  <p><b>Top-left → Top-right → Bottom-right → Bottom-left</b></p>
+
+  <div class="button-row">
+    <button id="captureObjectBtn">Capture Object</button>
+    <button id="resetCornersBtn" class="secondary-btn">Reset Corners</button>
+    <button id="calculateObjectBtn" class="success-btn">Calculate Width & Height</button>
+  </div>
+
+  <p id="measurementStatus" class="status">Waiting for camera capture.</p>
+
+  <div class="canvas-shell">
+    <canvas id="measurementCanvas"></canvas>
+  </div>
+
+  <div id="measurementResults" class="results-box hidden">
+    <div class="stats-grid">
+      <div><span>Width in Image</span><strong id="pixelWidthResult">-</strong></div>
+      <div><span>Height in Image</span><strong id="pixelHeightResult">-</strong></div>
+      <div><span>Estimated Width</span><strong id="widthResult">-</strong></div>
+      <div><span>Estimated Height</span><strong id="heightResult">-</strong></div>
+    </div>
+  </div>
 </section>
 
 <section id="step3" class="step-panel cv-card">
-<h3>Step 3 - Validation</h3>
-<div class="grid">
-<label>Validation distance (m)<input id="validationDistance" type="number" value="2.10" step="0.01"></label>
-<label>Validation Mode
-<select id="validationMode">
-<option value="predefined">Predefined 20 Objects</option>
-<option value="manual">Manual Entry</option>
-</select>
-</label>
-</div>
+  <h3>Step 3 - Validation</h3>
 
-<div id="manualFields" class="hidden grid">
-<label>Object name<input id="manualName"></label>
-<label>Actual width (cm)<input id="manualWidth" type="number" step="0.01"></label>
-<label>Actual height (cm)<input id="manualHeight" type="number" step="0.01"></label>
-</div>
+  <div class="form-row">
+    <div class="field small-field">
+      <label for="validationDistance">Validation distance (meters)</label>
+      <input id="validationDistance" type="number" value="2.10" step="0.01" min="0.01">
+    </div>
 
-<div class="validation-current"><h4>Current Object</h4><div id="currentObject">Press Begin Validation to start.</div></div>
+    <div class="field">
+      <label for="validationMode">Validation Mode</label>
+      <select id="validationMode">
+        <option value="predefined">Predefined 20 Objects</option>
+        <option value="manual">Manual Entry</option>
+      </select>
+    </div>
+  </div>
 
-<div class="button-row">
-<button id="beginValidationBtn">Begin Validation</button>
-<button id="captureValidationBtn">Capture Object</button>
-<button id="resetValidationCornersBtn">Reset Corners</button>
-<button id="saveValidationBtn">Calculate & Save Measurement</button>
-</div>
+  <div id="manualFields" class="hidden">
+    <div class="form-row">
+      <div class="field">
+        <label for="manualName">Object name</label>
+        <input id="manualName">
+      </div>
+      <div class="field">
+        <label for="manualWidth">Actual width (cm)</label>
+        <input id="manualWidth" type="number" step="0.01">
+      </div>
+      <div class="field">
+        <label for="manualHeight">Actual height (cm)</label>
+        <input id="manualHeight" type="number" step="0.01">
+      </div>
+    </div>
+  </div>
 
-<p id="validationStatus" class="status">Validation has not started.</p>
-<div class="canvas-shell"><canvas id="validationCanvas"></canvas></div>
+  <div class="validation-current">
+    <h4>Current Object</h4>
+    <div id="currentObject">Press Begin Validation to start.</div>
+  </div>
 
-<div class="table-wrap">
-<table id="validationTable">
-<thead><tr><th>#</th><th>Object</th><th>Actual W</th><th>Camera W</th><th>Actual H</th><th>Camera H</th><th>W Error %</th><th>H Error %</th></tr></thead>
-<tbody></tbody>
-</table>
-</div>
+  <div class="button-row">
+    <button id="beginValidationBtn">Begin Validation</button>
+    <button id="captureValidationBtn">Capture Object</button>
+    <button id="resetValidationCornersBtn" class="secondary-btn">Reset Corners</button>
+    <button id="saveValidationBtn" class="success-btn">Calculate & Save Measurement</button>
+  </div>
 
-<div class="button-row">
-<button id="finishValidationBtn">Generate Final Report</button>
-<button id="clearValidationBtn">Clear Validation</button>
-</div>
+  <p id="validationStatus" class="status">Validation has not started.</p>
+
+  <div class="canvas-shell">
+    <canvas id="validationCanvas"></canvas>
+  </div>
+
+  <div class="table-wrap">
+    <table id="validationTable">
+      <thead>
+        <tr>
+          <th>#</th><th>Object</th><th>Actual W</th><th>Camera W</th>
+          <th>Actual H</th><th>Camera H</th><th>W Error %</th><th>H Error %</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="button-row">
+    <button id="finishValidationBtn" class="success-btn">Generate Final Report</button>
+    <button id="clearValidationBtn" class="danger-btn">Clear Validation</button>
+  </div>
 </section>
 
 <section id="report" class="step-panel cv-card">
-<h3>Final Statistical Report</h3>
-<p id="reportSummary">Complete Step 3 and generate the report.</p>
-<div id="reportStats" class="hidden">
-<div class="grid">
-<div>Measurements: <b id="reportCount"></b></div>
-<div>Width Mean Error: <b id="reportWMean"></b></div>
-<div>Width MAE: <b id="reportWMAE"></b></div>
-<div>Width RMSE: <b id="reportWRMSE"></b></div>
-<div>Width MAPE: <b id="reportWMAPE"></b></div>
-<div>Width Std. Dev.: <b id="reportWStd"></b></div>
-<div>Height Mean Error: <b id="reportHMean"></b></div>
-<div>Height MAE: <b id="reportHMAE"></b></div>
-<div>Height RMSE: <b id="reportHRMSE"></b></div>
-<div>Height MAPE: <b id="reportHMAPE"></b></div>
-<div>Height Std. Dev.: <b id="reportHStd"></b></div>
-<div>Overall Avg. % Error: <b id="reportOverall"></b></div>
-</div>
+  <h3>Final Statistical Report</h3>
 
-<div class="table-wrap">
-<table id="reportTable">
-<thead><tr><th>#</th><th>Object</th><th>Human Width</th><th>Camera Width</th><th>Human Height</th><th>Camera Height</th></tr></thead>
-<tbody></tbody>
-</table>
-</div>
+  <p id="reportSummary">Complete Step 3 and generate the report.</p>
 
-<div class="button-row">
-<button id="downloadCsvBtn">Download CSV</button>
-<button id="printReportBtn">Print / Save PDF</button>
-</div>
-</div>
+  <div id="reportStats" class="hidden">
+    <div class="stats-grid">
+      <div><span>Measurements</span><strong id="reportCount">0</strong></div>
+      <div><span>Width Mean Error</span><strong id="reportWMean">-</strong></div>
+      <div><span>Width MAE</span><strong id="reportWMAE">-</strong></div>
+      <div><span>Width RMSE</span><strong id="reportWRMSE">-</strong></div>
+      <div><span>Width MAPE</span><strong id="reportWMAPE">-</strong></div>
+      <div><span>Width Std. Dev.</span><strong id="reportWStd">-</strong></div>
+      <div><span>Height Mean Error</span><strong id="reportHMean">-</strong></div>
+      <div><span>Height MAE</span><strong id="reportHMAE">-</strong></div>
+      <div><span>Height RMSE</span><strong id="reportHRMSE">-</strong></div>
+      <div><span>Height MAPE</span><strong id="reportHMAPE">-</strong></div>
+      <div><span>Height Std. Dev.</span><strong id="reportHStd">-</strong></div>
+      <div><span>Overall Avg. % Error</span><strong id="reportOverall">-</strong></div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="reportTable">
+        <thead>
+          <tr>
+            <th>#</th><th>Object</th><th>Human Width</th><th>Camera Width</th>
+            <th>Human Height</th><th>Camera Height</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="button-row">
+      <button id="downloadCsvBtn">Download CSV</button>
+      <button id="printReportBtn" class="secondary-btn">Print / Save PDF</button>
+    </div>
+  </div>
 </section>
-</main>
 
+</main>
 <script src="module2.js"></script>
 </body>
 </html>
