@@ -3,7 +3,8 @@
 // { name: "Module 3", page: "module3.html" }
 
 const modules = [
-  { name: "Module 2", page: "module2.html" }
+  { name: "Module 2", page: "module2.html" },
+  { name: "Module 3", page: "module3.html" },
 ];
 
 const moduleSelect = document.getElementById("moduleSelect");
