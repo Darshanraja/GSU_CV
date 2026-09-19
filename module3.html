@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module 3 | Computer Vision Assessment</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="header-inner">
+    <img src="assets/gsu-logo.png" class="header-logo" alt="Georgia State University">
+    <div>
+      <h1>Computer Vision Assessment</h1>
+      <p>CSc 8830 - Module 3</p>
+    </div>
+    <a href="index.html" class="back-link">Back to Modules</a>
+  </div>
+</header>
+
+<main class="module-container">
+
+<section class="cv-card">
+  <h2>Module 3 - Image Blurring</h2>
+  <p>Spatial-domain filtering versus Fourier-domain filtering.</p>
+</section>
+
+<section class="cv-card">
+  <h3>Input</h3>
+
+  <div class="form-row">
+    <div class="field">
+      <label for="imageUpload">Upload Image</label>
+      <input id="imageUpload" type="file" accept="image/*">
+    </div>
+
+    <div class="field">
+      <label for="kernelSize">Averaging Kernel Size</label>
+      <select id="kernelSize">
+        <option value="3">3 × 3</option>
+        <option value="5" selected>5 × 5</option>
+        <option value="7">7 × 7</option>
+        <option value="9">9 × 9</option>
+        <option value="15">15 × 15</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="button-row">
+    <button id="startCameraBtn">Start Camera</button>
+    <button id="captureCameraBtn">Capture Camera</button>
+    <button id="stopCameraBtn" class="secondary-btn">Stop Camera</button>
+    <button id="runExperimentBtn" class="success-btn">Run Experiment</button>
+  </div>
+
+  <p id="status" class="status">Upload an image or capture one from the camera.</p>
+
+  <div class="video-shell">
+    <video id="video" autoplay playsinline muted></video>
+  </div>
+</section>
+
+<section class="cv-card">
+  <h3>Results</h3>
+
+  <div class="image-grid">
+    <div class="image-card">
+      <h4>Original Image</h4>
+      <canvas id="originalCanvas"></canvas>
+    </div>
+
+    <div class="image-card">
+      <h4>Spatial Blur</h4>
+      <canvas id="spatialCanvas"></canvas>
+    </div>
+
+    <div class="image-card">
+      <h4>Fourier Blur</h4>
+      <canvas id="fourierCanvas"></canvas>
+    </div>
+
+    <div class="image-card">
+      <h4>Difference Image</h4>
+      <canvas id="differenceCanvas"></canvas>
+    </div>
+  </div>
+</section>
+
+<section class="cv-card">
+  <h3>Validation</h3>
+
+  <div class="stats-grid">
+    <div><span>Kernel</span><strong id="metricKernel">-</strong></div>
+    <div><span>MAE</span><strong id="metricMAE">-</strong></div>
+    <div><span>RMSE</span><strong id="metricRMSE">-</strong></div>
+    <div><span>Maximum Difference</span><strong id="metricMax">-</strong></div>
+    <div><span>Image Size</span><strong id="metricSize">-</strong></div>
+    <div><span>Result</span><strong id="metricResult">Not run</strong></div>
+  </div>
+
+  <div id="conclusion" class="info-box">
+    Run the experiment to compare the two filtering approaches.
+  </div>
+</section>
+
+<section class="cv-card">
+  <h3>Theory</h3>
+  <div class="info-box">
+    <p><b>Spatial domain:</b> g(x,y) = f(x,y) * h(x,y)</p>
+    <p><b>Fourier domain:</b> G(u,v) = F(u,v)H(u,v)</p>
+    <p><b>Inverse transform:</b> g(x,y) = F<sup>-1</sup>{F(u,v)H(u,v)}</p>
+    <p>Therefore, convolution in space is equivalent to multiplication in the Fourier domain.</p>
+  </div>
+</section>
+
+</main>
+
+<script src="module3.js"></script>
+</body>
+</html>

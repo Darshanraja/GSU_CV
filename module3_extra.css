@@ -1,0 +1,28 @@
+
+.image-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px;
+}
+.image-card{
+  background:#f8fafc;
+  border:1px solid #d8dee8;
+  border-radius:12px;
+  padding:14px;
+}
+.image-card h4{
+  margin-top:0;
+  color:#0039A6;
+}
+.image-card canvas{
+  display:block;
+  width:100%;
+  height:auto;
+  background:#111827;
+  border-radius:8px;
+}
+@media(max-width:800px){
+  .image-grid{
+    grid-template-columns:1fr;
+  }
+}
