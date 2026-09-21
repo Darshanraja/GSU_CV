@@ -208,6 +208,38 @@ function stopRgbCamera() {
   $("rgbVideo").srcObject = null;
 }
 
+function loadRgbUploadedImage(file) {
+  if (!file || !cvOk()) return;
+
+  stopRgbCamera();
+
+  const img = new Image();
+  const objectUrl = URL.createObjectURL(file);
+
+  img.onload = () => {
+    const c = $("rgbCanvas");
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    c.getContext("2d").drawImage(img, 0, 0);
+
+    deleteMat(rgbSource);
+    rgbSource = cv.imread(c);
+
+    resetRgbSegmentation();
+    $("rgbStatus").textContent =
+      "RGB image uploaded. Click Draw Rectangle, then drag tightly around the person.";
+
+    URL.revokeObjectURL(objectUrl);
+  };
+
+  img.onerror = () => {
+    $("rgbStatus").textContent = "Could not load the selected RGB image.";
+    URL.revokeObjectURL(objectUrl);
+  };
+
+  img.src = objectUrl;
+}
+
 function captureRgb() {
   if (!cvOk()) return;
   const video = $("rgbVideo");
@@ -397,9 +429,48 @@ function finalizeRgb() {
   seg.delete(); boundary.out.delete();
 }
 
+
+$("rgbImageInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file || !cvOk()) return;
+
+  const img = new Image();
+  const objectURL = URL.createObjectURL(file);
+
+  img.onload = () => {
+    stopRgbCamera();
+
+    const c = $("rgbCanvas");
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    c.getContext("2d").drawImage(img, 0, 0);
+
+    deleteMat(rgbSource);
+    rgbSource = cv.imread(c);
+
+    resetRgbSegmentation();
+
+    $("rgbStatus").textContent =
+      "RGB image uploaded. Click Draw Rectangle, then drag tightly around the person.";
+
+    URL.revokeObjectURL(objectURL);
+  };
+
+  img.onerror = () => {
+    $("rgbStatus").textContent = "Could not load the selected RGB image.";
+    URL.revokeObjectURL(objectURL);
+  };
+
+  img.src = objectURL;
+});
+
 $("rgbStartCamera").addEventListener("click", startRgbCamera);
 $("rgbStopCamera").addEventListener("click", stopRgbCamera);
 $("rgbCapture").addEventListener("click", captureRgb);
+$("rgbImageInput").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0];
+  if (file) loadRgbUploadedImage(file);
+});
 $("rgbReset").addEventListener("click", resetRgbSegmentation);
 $("rgbRectMode").addEventListener("click", () => { rgbMode="rect"; $("rgbStatus").textContent="Drag a rectangle around the person."; });
 $("rgbHumanMode").addEventListener("click", () => { rgbMode="human"; $("rgbStatus").textContent="Paint definite human regions."; });
@@ -502,6 +573,27 @@ function loadThermalImage(src) {
 }
 
 $("thermalImageSelect").addEventListener("change", e => loadThermalImage(e.target.value));
+
+
+$("thermalImageInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file || !cvOk()) return;
+
+  const objectURL = URL.createObjectURL(file);
+
+  const sel = $("thermalImageSelect");
+  sel.innerHTML = "";
+
+  const opt = document.createElement("option");
+  opt.value = objectURL;
+  opt.textContent = "Uploaded - " + file.name;
+  sel.appendChild(opt);
+
+  loadThermalImage(objectURL);
+
+  $("thermalStatus").textContent =
+    "Thermal image uploaded. Adjust Threshold / Close Size or use Auto Otsu + Largest Blob.";
+});
 
 $("thermalFolderInput").addEventListener("change", e => {
   thermalObjectURLs.forEach(URL.revokeObjectURL);
