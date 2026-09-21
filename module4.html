@@ -1,291 +1,336 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Module 4 | Human Boundary Detection</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="module4.css">
-  <script>
-    window.cvReady = false;
-    window.Module = {
-      onRuntimeInitialized() {
-        window.cvReady = true;
-        const s = document.getElementById("opencvStatus");
-        if (s) s.textContent = "OpenCV.js ready.";
-      }
-    };
-  </script>
-  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
-</head>
-<body>
-<header class="site-header">
-  <div class="header-inner">
-    <img src="assets/gsu-logo.png" class="header-logo" alt="Georgia State University">
-    <div>
-      <h1>Computer Vision Assessment</h1>
-      <p>CSc 8830 - Module 4</p>
-    </div>
-    <a href="index.html" class="back-link">Back to Modules</a>
-  </div>
-</header>
-
-<main class="module-container">
-
-<section class="cv-card">
-  <h2>Module 4 - Human Boundary Detection</h2>
-  <p>
-    Classical computer vision only for the implemented RGB and thermal methods.
-    SAM2 is used only as a comparison baseline.
-  </p>
-  <p id="opencvStatus" class="status">Loading OpenCV.js...</p>
-</section>
-
-<div class="step-nav">
-  <button class="step-tab active" data-target="rgbPanel">Problem 1<br><span>RGB Human</span></button>
-  <button class="step-tab" data-target="thermalPanel">Problem 2<br><span>Thermal Human</span></button>
-  <button class="step-tab" data-target="samPanel">Comparison<br><span>SAM2 Mask</span></button>
-  <button class="step-tab" data-target="theoryPanel">Problem 3<br><span>Fourier Theory</span></button>
-</div>
-
-<section id="rgbPanel" class="cv-card step-panel active-panel">
-  <h3>Problem 1 - RGB Human Boundary Detection</h3>
-  <p>
-    Browser version of the working classical GrabCut workflow:
-    capture → rectangle → foreground/background refinement → contour.
-  </p>
-
-  <div class="form-row">
-    <div class="field">
-      <label for="cameraSelect">Camera</label>
-      <select id="cameraSelect"></select>
-    </div>
-    <div class="field">
-      <label for="rgbImageInput">Or Upload RGB Image</label>
-      <input id="rgbImageInput" type="file" accept="image/*">
-    </div>
-  </div>
-
-  <div class="button-row">
-    <button id="rgbStartCamera">Start Camera</button>
-    <button id="rgbCapture">Capture</button>
-    <button id="rgbStopCamera" class="secondary-btn">Stop Camera</button>
-    <button id="rgbReset" class="secondary-btn">Reset</button>
-  </div>
-
-  <div class="video-shell">
-    <video id="rgbVideo" autoplay playsinline muted></video>
-  </div>
-
-  <div class="button-row">
-    <button id="rgbRectMode">1. Draw Rectangle</button>
-    <button id="rgbHumanMode" class="success-btn">2. Mark Human</button>
-    <button id="rgbBackgroundMode" class="danger-btn">3. Mark Background</button>
-    <button id="rgbRefine">G - Refine</button>
-    <button id="rgbFinish">S - Finalize</button>
-  </div>
-
-  <p id="rgbStatus" class="status">
-    Start the camera and capture an image. On macOS, select the iPhone Continuity Camera in the camera list if it appears.
-  </p>
-
-  <div class="rgb-workspace">
-    <div>
-      <h4>Interactive Image</h4>
-      <div class="canvas-shell">
-        <canvas id="rgbCanvas"></canvas>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Module 4 | Human Boundary Detection</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="module4.css" />
+    <script>
+      window.cvReady = false;
+      window.Module = {
+        onRuntimeInitialized() {
+          window.cvReady = true;
+          const s = document.getElementById("opencvStatus");
+          if (s) s.textContent = "OpenCV.js ready.";
+        },
+      };
+    </script>
+    <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <img
+          src="assets/gsu-logo.png"
+          class="header-logo"
+          alt="Georgia State University"
+        />
+        <div>
+          <h1>Computer Vision Assessment</h1>
+          <p>CSc 8830 - Module 4</p>
+        </div>
+        <a href="index.html" class="back-link">Back to Modules</a>
       </div>
-    </div>
-    <div>
-      <h4>Segmentation Preview</h4>
-      <div class="canvas-shell">
-        <canvas id="rgbPreview"></canvas>
+    </header>
+
+    <main class="module-container">
+      <section class="cv-card">
+        <h2>Module 4 - Human Boundary Detection</h2>
+        <p>
+          Classical computer vision only for the implemented RGB and thermal
+          methods. SAM2 is used only as a comparison baseline.
+        </p>
+        <p id="opencvStatus" class="status">Loading OpenCV.js...</p>
+      </section>
+
+      <div class="step-nav">
+        <button class="step-tab active" data-target="rgbPanel">
+          Problem 1<br /><span>RGB Human</span>
+        </button>
+        <button class="step-tab" data-target="thermalPanel">
+          Problem 2<br /><span>Thermal Human</span>
+        </button>
+        <button class="step-tab" data-target="samPanel">
+          Comparison<br /><span>SAM2 Mask</span>
+        </button>
+        <button class="step-tab" data-target="theoryPanel">
+          Problem 3<br /><span>Fourier Theory</span>
+        </button>
       </div>
-    </div>
-  </div>
 
-  <div class="results-box">
-    <div class="stats-grid">
-      <div><span>Contour Area</span><strong id="rgbArea">-</strong></div>
-      <div><span>Boundary Length</span><strong id="rgbPerimeter">-</strong></div>
-      <div><span>Boundary Points</span><strong id="rgbPoints">-</strong></div>
-    </div>
-  </div>
+      <section id="rgbPanel" class="cv-card step-panel active-panel">
+        <h3>Problem 1 - RGB Human Boundary Detection</h3>
+        <p>
+          Browser version of the working classical GrabCut workflow: capture →
+          rectangle → foreground/background refinement → contour.
+        </p>
 
-  <div class="image-grid">
-    <div class="image-card"><h4>Final Mask</h4><canvas id="rgbMaskCanvas"></canvas></div>
-    <div class="image-card"><h4>Final Segmented Human</h4><canvas id="rgbSegmentedCanvas"></canvas></div>
-    <div class="image-card"><h4>Final Boundary</h4><canvas id="rgbBoundaryCanvas"></canvas></div>
-  </div>
-</section>
+        <div class="form-row">
+          <div class="field">
+            <label for="cameraSelect">Camera</label>
+            <select id="cameraSelect"></select>
+          </div>
+          <div class="field">
+            <label for="rgbImageInput">Or Upload RGB Image</label>
+            <input id="rgbImageInput" type="file" accept="image/*" />
+          </div>
+        </div>
 
-<section id="thermalPanel" class="cv-card step-panel">
-  <h3>Problem 2 - Thermal Human Boundary Detection</h3>
-  <p>
-    The page first tries to load the five thermal images already stored in
-    <b>IMage1</b> (also checks <b>Image1</b> and <b>image1</b>).
-    If browser directory listing is unavailable, use “Choose Thermal Folder”.
-  </p>
+        <div class="button-row">
+          <button id="rgbStartCamera">Start Camera</button>
+          <button id="rgbCapture">Capture</button>
+          <button id="rgbStopCamera" class="secondary-btn">Stop Camera</button>
+          <button id="rgbReset" class="secondary-btn">Reset</button>
+        </div>
 
-  <div class="form-row">
-    <div class="field">
-      <label for="thermalImageSelect">Thermal Image</label>
-      <select id="thermalImageSelect">
-        <option value="">Searching for images...</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="thermalImageInput">Or Upload One Thermal Image</label>
-      <input id="thermalImageInput" type="file" accept="image/*">
-    </div>
-    <div class="field">
-      <label for="thermalFolderInput">Or Choose Thermal Folder</label>
-      <input id="thermalFolderInput" type="file" accept="image/*" multiple webkitdirectory directory>
-    </div>
-  </div>
+        <div class="video-shell">
+          <video id="rgbVideo" autoplay playsinline muted></video>
+        </div>
 
-  <div class="form-row">
-    <div class="field">
-      <label for="thermalThreshold">Threshold: <span id="thermalThresholdValue">128</span></label>
-      <input id="thermalThreshold" type="range" min="0" max="255" value="128">
-    </div>
-    <div class="field">
-      <label for="thermalClose">Close Size: <span id="thermalCloseValue">5</span></label>
-      <input id="thermalClose" type="range" min="0" max="25" value="5">
-    </div>
-    <div class="field compact-check">
-      <label><input id="thermalInvert" type="checkbox"> Black-hot / invert</label>
-      <label><input id="thermalGrabcut" type="checkbox"> GrabCut boundary refinement</label>
-    </div>
-  </div>
+        <div class="button-row">
+          <button id="rgbRectMode">1. Draw Rectangle</button>
+          <button id="rgbHumanMode" class="success-btn">2. Mark Human</button>
+          <button id="rgbBackgroundMode" class="danger-btn">
+            3. Mark Background
+          </button>
+          <button id="rgbRefine">G - Refine</button>
+          <button id="rgbFinish">S - Finalize</button>
+        </div>
 
-  <div class="button-row">
-    <button id="thermalAuto">Auto Otsu + Largest Blob</button>
-    <button id="thermalRun" class="success-btn">Process Current Image</button>
-    <button id="thermalClearSelection" class="secondary-btn">Clear Blob Selection</button>
-  </div>
+        <p id="rgbStatus" class="status">
+          Start the camera and capture an image. On macOS, select the iPhone
+          Continuity Camera in the camera list if it appears.
+        </p>
 
-  <p id="thermalStatus" class="status">
-    Select a thermal image. Click a candidate blob in the left image to select/deselect it.
-  </p>
+        <div class="rgb-workspace">
+          <div>
+            <h4>Interactive Image</h4>
+            <div class="canvas-shell">
+              <canvas id="rgbCanvas"></canvas>
+            </div>
+          </div>
+          <div>
+            <h4>Segmentation Preview</h4>
+            <div class="canvas-shell">
+              <canvas id="rgbPreview"></canvas>
+            </div>
+          </div>
+        </div>
 
-  <div class="rgb-workspace">
-    <div>
-      <h4>Candidate Regions / Selection</h4>
-      <div class="canvas-shell">
-        <canvas id="thermalCanvas"></canvas>
-      </div>
-    </div>
-    <div>
-      <h4>Segmented Human</h4>
-      <div class="canvas-shell">
-        <canvas id="thermalPreview"></canvas>
-      </div>
-    </div>
-  </div>
+        <div class="results-box">
+          <div class="stats-grid">
+            <div><span>Contour Area</span><strong id="rgbArea">-</strong></div>
+            <div>
+              <span>Boundary Length</span><strong id="rgbPerimeter">-</strong>
+            </div>
+            <div>
+              <span>Boundary Points</span><strong id="rgbPoints">-</strong>
+            </div>
+          </div>
+        </div>
 
-  <div class="results-box">
-    <div class="stats-grid">
-      <div><span>Total Human Area</span><strong id="thermalArea">-</strong></div>
-      <div><span>Total Boundary Length</span><strong id="thermalPerimeter">-</strong></div>
-      <div><span>Boundary Points</span><strong id="thermalPoints">-</strong></div>
-    </div>
-  </div>
+        <div class="image-grid">
+          <div class="image-card">
+            <h4>Final Mask</h4>
+            <canvas id="rgbMaskCanvas"></canvas>
+          </div>
+          <div class="image-card">
+            <h4>Final Segmented Human</h4>
+            <canvas id="rgbSegmentedCanvas"></canvas>
+          </div>
+          <div class="image-card">
+            <h4>Final Boundary</h4>
+            <canvas id="rgbBoundaryCanvas"></canvas>
+          </div>
+        </div>
+      </section>
 
-  <div class="image-grid">
-    <div class="image-card"><h4>Final Mask</h4><canvas id="thermalMaskCanvas"></canvas></div>
-    <div class="image-card"><h4>Final Segmented Human</h4><canvas id="thermalSegmentedCanvas"></canvas></div>
-    <div class="image-card"><h4>Final Boundary</h4><canvas id="thermalBoundaryCanvas"></canvas></div>
-  </div>
-</section>
+      <section id="thermalPanel" class="cv-card step-panel">
+        <h3>Problem 2 - Thermal Human Boundary Detection</h3>
+        <p>
+          Classical pipeline: blur and contrast stretch, Otsu threshold,
+          morphology, warm-region selection, then optional GrabCut edge
+          refinement. Upload a thermal image or capture one from a camera, then
+          <b>Generate</b>, <b>Refine</b> and <b>Save</b>.
+        </p>
 
-<section id="samPanel" class="cv-card step-panel">
-  <h3>SAM2 Comparison</h3>
-  <p>
-    Run SAM2 separately on the same source image, export its human mask, and upload the mask here.
-    The website compares that mask with the classical result. SAM2 is not used inside the classical segmentation pipeline.
-  </p>
+        <div class="form-row">
+          <div class="field">
+            <label for="thermalCameraSelect">Camera</label>
+            <select id="thermalCameraSelect"></select>
+          </div>
+          <div class="field">
+            <label for="thermalImageInput">Or Upload Thermal Image</label>
+            <input id="thermalImageInput" type="file" accept="image/*" />
+          </div>
+        </div>
 
-  <div class="form-row">
-    <div class="field">
-      <label for="samTarget">Compare SAM2 Against</label>
-      <select id="samTarget">
-        <option value="rgb">RGB classical mask</option>
-        <option value="thermal">Thermal classical mask</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="samMaskInput">Upload SAM2 Mask</label>
-      <input id="samMaskInput" type="file" accept="image/*">
-    </div>
-  </div>
+        <div class="button-row">
+          <button id="thermalStartCamera">Start Camera</button>
+          <button id="thermalCapture">Capture</button>
+        </div>
 
-  <div class="button-row">
-    <button id="compareSam" class="success-btn">Compare Masks</button>
-  </div>
+        <div class="video-shell">
+          <video id="thermalVideo" autoplay playsinline muted></video>
+        </div>
 
-  <div class="image-grid">
-    <div class="image-card"><h4>Classical Mask</h4><canvas id="samClassicalCanvas"></canvas></div>
-    <div class="image-card"><h4>SAM2 Mask</h4><canvas id="samUploadedCanvas"></canvas></div>
-    <div class="image-card"><h4>Difference</h4><canvas id="samDiffCanvas"></canvas></div>
-  </div>
+        <div class="button-row">
+          <button id="thermalGenerate" class="success-btn">1. Generate</button>
+          <button id="thermalRefine">2. Refine</button>
+          <button id="thermalSave" class="success-btn">3. Save</button>
+        </div>
 
-  <div class="stats-grid">
-    <div><span>IoU</span><strong id="samIoU">-</strong></div>
-    <div><span>Dice Score</span><strong id="samDice">-</strong></div>
-    <div><span>Precision</span><strong id="samPrecision">-</strong></div>
-    <div><span>Recall</span><strong id="samRecall">-</strong></div>
-  </div>
-</section>
+        <p id="thermalStatus" class="status">
+          Upload a thermal image or capture one from a camera, then click
+          Generate.
+        </p>
 
-<section id="theoryPanel" class="cv-card step-panel">
-  <h3>Problem 3 - Fourier-Domain Edge Detection and Segmentation</h3>
+        <div class="rgb-workspace">
+          <div>
+            <h4>Warm Regions / Selected Person</h4>
+            <div class="canvas-shell">
+              <canvas id="thermalCanvas"></canvas>
+            </div>
+          </div>
+          <div>
+            <h4>Segmented Human</h4>
+            <div class="canvas-shell">
+              <canvas id="thermalPreview"></canvas>
+            </div>
+          </div>
+        </div>
 
-  <div class="info-box">
-    <p><b>Image transform:</b> F(u,v) = F{f(x,y)}</p>
-    <p>
-      Smooth image regions change slowly and are dominated by low spatial frequencies.
-      Object boundaries contain rapid intensity changes and therefore contribute strongly
-      to higher spatial frequencies.
-    </p>
+        <div class="results-box">
+          <div class="stats-grid">
+            <div>
+              <span>Total Human Area</span><strong id="thermalArea">-</strong>
+            </div>
+            <div>
+              <span>Total Boundary Length</span
+              ><strong id="thermalPerimeter">-</strong>
+            </div>
+            <div>
+              <span>Boundary Points</span><strong id="thermalPoints">-</strong>
+            </div>
+          </div>
+        </div>
 
-    <p><b>Frequency filtering:</b> G(u,v) = H(u,v)F(u,v)</p>
-    <p><b>Return to the image domain:</b> g(x,y) = F<sup>-1</sup>{G(u,v)}</p>
+        <div class="image-grid">
+          <div class="image-card">
+            <h4>Final Mask</h4>
+            <canvas id="thermalMaskCanvas"></canvas>
+          </div>
+          <div class="image-card">
+            <h4>Final Segmented Human</h4>
+            <canvas id="thermalSegmentedCanvas"></canvas>
+          </div>
+          <div class="image-card">
+            <h4>Final Boundary</h4>
+            <canvas id="thermalBoundaryCanvas"></canvas>
+          </div>
+        </div>
+      </section>
 
-    <p>
-      A high-pass filter suppresses slowly varying components while retaining rapid
-      intensity transitions. After the inverse transform, strong responses occur near
-      boundaries and can be thresholded to form an edge map.
-    </p>
+      <section id="samPanel" class="cv-card step-panel">
+        <h3>SAM2 Comparison</h3>
+        <p>
+          Run SAM2 separately on the same source image, export its human mask,
+          and upload the mask here. The website compares that mask with the
+          classical result. SAM2 is not used inside the classical segmentation
+          pipeline.
+        </p>
 
-    <hr>
+        <div class="form-row">
+          <div class="field">
+            <label for="samTarget">Compare SAM2 Against</label>
+            <select id="samTarget">
+              <option value="rgb">RGB classical mask</option>
+              <option value="thermal">Thermal classical mask</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="samMaskInput">Upload SAM2 Mask</label>
+            <input id="samMaskInput" type="file" accept="image/*" />
+          </div>
+        </div>
 
-    <p><b>Derivative relation:</b></p>
-    <p>
-      F{∂f/∂x} = j2πuF(u,v), &nbsp;&nbsp;
-      F{∂f/∂y} = j2πvF(u,v)
-    </p>
+        <div class="button-row">
+          <button id="compareSam" class="success-btn">Compare Masks</button>
+        </div>
 
-    <p>
-      Differentiation in the image domain therefore corresponds to multiplication by
-      frequency in the Fourier domain. Large high-frequency responses indicate rapid
-      spatial change, which is the mathematical basis for frequency-domain edge detection.
-    </p>
+        <div class="image-grid">
+          <div class="image-card">
+            <h4>Classical Mask</h4>
+            <canvas id="samClassicalCanvas"></canvas>
+          </div>
+          <div class="image-card">
+            <h4>SAM2 Mask</h4>
+            <canvas id="samUploadedCanvas"></canvas>
+          </div>
+          <div class="image-card">
+            <h4>Difference</h4>
+            <canvas id="samDiffCanvas"></canvas>
+          </div>
+        </div>
 
-    <hr>
+        <div class="stats-grid">
+          <div><span>IoU</span><strong id="samIoU">-</strong></div>
+          <div><span>Dice Score</span><strong id="samDice">-</strong></div>
+          <div><span>Precision</span><strong id="samPrecision">-</strong></div>
+          <div><span>Recall</span><strong id="samRecall">-</strong></div>
+        </div>
+      </section>
 
-    <p><b>Region segmentation:</b></p>
-    <p>
-      A low-pass filter can first suppress noise and small texture. A high-pass or
-      band-pass response can then emphasize region boundaries. After inverse transformation,
-      thresholding and connected-component analysis can convert the filtered response into
-      segmented regions.
-    </p>
-  </div>
-</section>
+      <section id="theoryPanel" class="cv-card step-panel">
+        <h3>Problem 3 - Fourier-Domain Edge Detection and Segmentation</h3>
 
-</main>
+        <div class="info-box">
+          <p><b>Image transform:</b> F(u,v) = F{f(x,y)}</p>
+          <p>
+            Smooth image regions change slowly and are dominated by low spatial
+            frequencies. Object boundaries contain rapid intensity changes and
+            therefore contribute strongly to higher spatial frequencies.
+          </p>
 
-<script src="module4.js"></script>
-</body>
+          <p><b>Frequency filtering:</b> G(u,v) = H(u,v)F(u,v)</p>
+          <p>
+            <b>Return to the image domain:</b> g(x,y) = F<sup>-1</sup>{G(u,v)}
+          </p>
+
+          <p>
+            A high-pass filter suppresses slowly varying components while
+            retaining rapid intensity transitions. After the inverse transform,
+            strong responses occur near boundaries and can be thresholded to
+            form an edge map.
+          </p>
+
+          <hr />
+
+          <p><b>Derivative relation:</b></p>
+          <p>F{∂f/∂x} = j2πuF(u,v), &nbsp;&nbsp; F{∂f/∂y} = j2πvF(u,v)</p>
+
+          <p>
+            Differentiation in the image domain therefore corresponds to
+            multiplication by frequency in the Fourier domain. Large
+            high-frequency responses indicate rapid spatial change, which is the
+            mathematical basis for frequency-domain edge detection.
+          </p>
+
+          <hr />
+
+          <p><b>Region segmentation:</b></p>
+          <p>
+            A low-pass filter can first suppress noise and small texture. A
+            high-pass or band-pass response can then emphasize region
+            boundaries. After inverse transformation, thresholding and
+            connected-component analysis can convert the filtered response into
+            segmented regions.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <script src="module4.js"></script>
+  </body>
 </html>
