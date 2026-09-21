@@ -5,6 +5,7 @@
 const modules = [
   { name: "Module 2", page: "module2.html" },
   { name: "Module 3", page: "module3.html" },
+  { name: "Module 4", page: "module4.html" },
 ];
 
 const moduleSelect = document.getElementById("moduleSelect");
