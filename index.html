@@ -1,22 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Computer Vision Assessment | Georgia State University</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
 <body>
-  <main class="home-wrapper">
-    <div class="home-card">
-      <img src="assets/gsu-logo.png" alt="GSU Logo" class="home-logo" />
+  <main class="page-shell">
+    <section class="card">
+      <img src="assets/gsu-logo.png" alt="Georgia State University Logo" class="gsu-logo" />
 
       <h1>Computer Vision Assessment</h1>
-      <p>CSc 8830 - Computer Vision</p>
+      <p class="subtitle">CSc 8830 - Computer Vision</p>
 
-      <label for="moduleSelect">Select Module</label>
-      <select id="moduleSelect">
-        <option value="">Choose a module</option>
-        <option value="module2.html">Module 2</option>
-        <option value="module3.html">Module 3</option>
-        <option value="module4.html">Module 4</option>
-      </select>
+      <div class="module-box">
+        <label for="moduleSelect">Select Module</label>
 
-      <button onclick="openModule()">Open Module</button>
-    </div>
+        <select id="moduleSelect">
+          <option value="">Choose a module</option>
+        </select>
+
+        <button id="openModuleButton" type="button">Open Module</button>
+
+        <p id="message" class="message"></p>
+      </div>
+    </section>
   </main>
 
   <script src="script.js"></script>
 </body>
+</html>
