@@ -298,7 +298,17 @@
             </select>
           </div>
           <div class="field">
-            <label for="samMaskInput">Upload SAM2 Mask</label>
+            <label for="samMaskSelect">SAM2 Mask</label>
+            <select id="samMaskSelect">
+              <option value="upload">Upload my own file...</option>
+              <option value="rgb_body">
+                Preloaded: RGB whole-body SAM2 mask
+              </option>
+              <option value="thermal">Preloaded: Thermal SAM2 mask</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="samMaskInput">Or Upload SAM2 Mask</label>
             <input id="samMaskInput" type="file" accept="image/*" />
           </div>
         </div>
