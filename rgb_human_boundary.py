@@ -2,16 +2,20 @@
 CSc 8830 - Computer Vision
 Problem 1: RGB human boundary detection (classical CV only, no ML/DL)
 
-Usage:
-    python rgb_human_boundary.py                 # iPhone Continuity Camera
-    python rgb_human_boundary.py --image me.jpg  # existing image (handy for SAM2 comparison)
+Usage (run it twice on the same image - once per target):
+    python rgb_human_boundary.py --image me.jpg --target body   # WHOLE person (default)
+    python rgb_human_boundary.py --image me.jpg --target face   # FACE / head only
+    python rgb_human_boundary.py                                # iPhone Continuity Camera, whole body
 
 Workflow:
     1. (camera) SPACE to capture
-    2. Drag a rectangle around the person, ENTER to confirm
-       -> the script AUTO-SEEDS GrabCut from colour statistics of the box
+    2. Drag a rectangle:  body -> around the WHOLE person (head to bottom edge)
+                          face -> around the HEAD (hair to chin)
+       ENTER to confirm -> the script AUTO-SEEDS GrabCut from colour statistics of the box
     3. Refine:  LEFT drag = human, RIGHT drag = background
                 G = re-run GrabCut, R = reset to auto-seed, S = save, ESC = cancel
+
+Saves rgb_original.png, rgb_<target>_mask.png, rgb_<target>_segmented.png, rgb_<target>_boundary.png
 """
 
 import argparse
@@ -20,9 +24,12 @@ import numpy as np
 
 CAMERA_INDEX = 1
 OUTPUT_ORIGINAL = "rgb_original.png"
-OUTPUT_MASK = "rgb_human_mask.png"
-OUTPUT_SEGMENTED = "rgb_segmented_human.png"
-OUTPUT_BOUNDARY = "rgb_human_boundary.png"
+
+
+def output_names(target):
+    return (f"rgb_{target}_mask.png",
+            f"rgb_{target}_segmented.png",
+            f"rgb_{target}_boundary.png")
 
 
 # ------------------------------------------------------------------
@@ -69,10 +76,10 @@ def resize_for_display(image, max_width=800, max_height=800):
 # ------------------------------------------------------------------
 # Step 1: rectangle
 # ------------------------------------------------------------------
-def select_human_rectangle(image):
+def select_human_rectangle(image, target="body"):
     display, scale = resize_for_display(image, 1200, 800)
     state = {"drawing": False, "p1": None, "p2": None, "rect": None}
-    win = "Step 1 - Select Human"
+    win = "Step 1 - Select " + ("Face" if target == "face" else "Whole Body")
 
     def on_mouse(event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -90,13 +97,15 @@ def select_human_rectangle(image):
 
     cv2.namedWindow(win, cv2.WINDOW_AUTOSIZE)
     cv2.setMouseCallback(win, on_mouse)
-    print("STEP 1: drag a TIGHT rectangle around the person. ENTER=confirm R=reset ESC=cancel")
+    what = "the HEAD (hair to chin)" if target == "face" else "the WHOLE person (head to bottom edge)"
+    print(f"STEP 1: drag a rectangle around {what}. ENTER=confirm R=reset ESC=cancel")
 
     while True:
         frame = display.copy()
         if state["p1"] and state["p2"]:
             cv2.rectangle(frame, state["p1"], state["p2"], (0, 255, 0), 3)
-        cv2.putText(frame, "Drag around person | ENTER confirm | R reset", (20, 40),
+        cv2.putText(frame, ("Drag around HEAD" if target == "face" else "Drag around WHOLE person")
+                    + " | ENTER confirm | R reset", (20, 40),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         cv2.imshow(win, frame)
         key = cv2.waitKey(20) & 0xFF
@@ -114,23 +123,31 @@ def select_human_rectangle(image):
 # ------------------------------------------------------------------
 # Auto-seeding (the fix)
 # ------------------------------------------------------------------
-def build_initial_mask(image, rect, edge_frac=0.10, thresh=9.0):
+def build_initial_mask(image, rect, edge_frac=0.10, thresh=9.0, mode="body"):
     """
     Seed GrabCut with more than just "everything in the box is foreground".
 
-    1. Outside the box                       -> sure background
-    2. Learn the background colour (Lab mean/covariance) from the two TOP
-       CORNERS and the upper side edges of the box (top-centre is skipped
-       because that is where hair/head usually is).
-    3. Pixels in the box close to that colour (Mahalanobis distance)
-                                             -> probable background
-       everything else                       -> probable foreground
-    4. Background-coloured pixels touching the top corners / upper sides
-                                             -> sure background
-    5. Torso prior: lower-middle of the box  -> never "background-coloured"
-       (a light shirt is often close to a light wall)
-    6. Small ellipse in the middle of the box -> sure foreground
+    mode="body"  (rectangle around the WHOLE person)
+      1. Outside the box                       -> sure background
+      2. Learn the background colour (Lab mean/covariance) from the two TOP
+         CORNERS and the upper side edges of the box (top-centre is skipped
+         because that is where the head usually is).
+      3. Pixels in the box close to that colour (Mahalanobis distance)
+                                               -> probable background
+         everything else                       -> probable foreground
+      4. Background-coloured pixels touching the top corners / upper sides
+                                               -> sure background
+      5. Torso prior: lower-middle of the box  -> never "background-coloured"
+         (a light shirt is often close to a light wall)
+      6. Small ellipse in the middle of the box -> sure foreground
+
+    mode="face"  (rectangle around the HEAD only)
+      A tight head box is mostly hair and face, so the background is ONLY in the
+      corners of the box: sample the two top corners only (no side strips, which
+      would contain hair), no torso prior, and put the sure-foreground ellipse on
+      the face.
     """
+    face = mode == "face"
     h, w = image.shape[:2]
     x, y, rw, rh = rect
     x, y = max(0, x), max(0, y)
@@ -144,37 +161,49 @@ def build_initial_mask(image, rect, edge_frac=0.10, thresh=9.0):
 
     bw = max(5, int(rw * edge_frac))
     bh = max(5, int(rh * edge_frac))
-    cw = int(rw * 0.25)
+    cw = max(5, int(rw * 0.10)) if face else max(1, int(rw * 0.25))
+    ch = max(5, int(rh * 0.08)) if face else bh * 2
     side_h = int(rh * 0.5)
 
-    samples = np.concatenate([
-        roi[:bh * 2, :cw].reshape(-1, 3),
-        roi[:bh * 2, -cw:].reshape(-1, 3),
-        roi[:side_h, :bw].reshape(-1, 3),
-        roi[:side_h, -bw:].reshape(-1, 3),
-    ])
+    if face:
+        samples = np.concatenate([
+            roi[:ch, :cw].reshape(-1, 3),
+            roi[:ch, -cw:].reshape(-1, 3),
+        ])
+    else:
+        samples = np.concatenate([
+            roi[:ch, :cw].reshape(-1, 3),
+            roi[:ch, -cw:].reshape(-1, 3),
+            roi[:side_h, :bw].reshape(-1, 3),
+            roi[:side_h, -bw:].reshape(-1, 3),
+        ])
     mean = samples.mean(axis=0)
     inv_cov = np.linalg.inv(np.cov(samples.T) + 4.0 * np.eye(3))
     d = roi - mean
     maha2 = np.einsum("ijk,kl,ijl->ij", d, inv_cov, d)
     likely_bg = maha2 < thresh
 
-    torso = np.zeros((rh, rw), bool)
-    torso[int(rh * 0.65):, int(rw * 0.15):int(rw * 0.85)] = True
-    likely_bg &= ~torso
+    if not face:
+        torso = np.zeros((rh, rw), bool)
+        torso[int(rh * 0.65):, int(rw * 0.15):int(rw * 0.85)] = True
+        likely_bg &= ~torso
 
     sub = np.where(likely_bg, cv2.GC_PR_BGD, cv2.GC_PR_FGD).astype(np.uint8)
 
     band = np.zeros((rh, rw), bool)
-    band[:bh, :cw] = True
-    band[:bh, -cw:] = True
-    band[:side_h, :bw] = True
-    band[:side_h, -bw:] = True
+    if face:
+        band[:ch, :cw] = True
+        band[:ch, -cw:] = True
+    else:
+        band[:bh, :cw] = True
+        band[:bh, -cw:] = True
+        band[:side_h, :bw] = True
+        band[:side_h, -bw:] = True
     sub[band & likely_bg] = cv2.GC_BGD
 
     core = np.zeros((rh, rw), np.uint8)
-    cv2.ellipse(core, (rw // 2, int(rh * 0.6)),
-                (max(3, int(rw * 0.10)), max(3, int(rh * 0.18))),
+    cv2.ellipse(core, (rw // 2, int(rh * (0.55 if face else 0.6))),
+                (max(3, int(rw * (0.12 if face else 0.10))), max(3, int(rh * 0.18))),
                 0, 0, 360, 1, -1)
     sub[core == 1] = cv2.GC_FGD
 
@@ -189,8 +218,8 @@ def to_binary(mask):
 # ------------------------------------------------------------------
 # Step 2: interactive GrabCut
 # ------------------------------------------------------------------
-def interactive_grabcut(image, rectangle):
-    seed_mask = build_initial_mask(image, rectangle)
+def interactive_grabcut(image, rectangle, mode="body"):
+    seed_mask = build_initial_mask(image, rectangle, mode=mode)
     mask = seed_mask.copy()
     bgd = np.zeros((1, 65), np.float64)
     fgd = np.zeros((1, 65), np.float64)
@@ -297,7 +326,10 @@ def find_boundary(image, mask):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--image", help="use this image instead of the camera")
+    ap.add_argument("--target", choices=["body", "face"], default="body",
+                    help="body = whole person (default), face = head only")
     args = ap.parse_args()
+    output_mask, output_segmented, output_boundary = output_names(args.target)
 
     image = cv2.imread(args.image) if args.image else capture_iphone_image()
     if image is None:
@@ -305,12 +337,12 @@ def main():
         return
     cv2.imwrite(OUTPUT_ORIGINAL, image)
 
-    rect = select_human_rectangle(image)
+    rect = select_human_rectangle(image, args.target)
     if rect is None:
         print("No rectangle selected.")
         return
 
-    mask = interactive_grabcut(image, rect)
+    mask = interactive_grabcut(image, rect, args.target)
     if mask is None:
         return
 
@@ -321,19 +353,19 @@ def main():
         return
     segmented = cv2.bitwise_and(image, image, mask=mask)
 
-    print("\n=== RGB HUMAN SEGMENTATION RESULT ===")
+    print(f"\n=== RGB {args.target.upper()} SEGMENTATION RESULT ===")
     print("Contour area   :", cv2.contourArea(contour), "px")
     print("Boundary length:", cv2.arcLength(contour, True), "px")
     print("Boundary points:", len(contour))
 
-    cv2.imwrite(OUTPUT_MASK, mask)
-    cv2.imwrite(OUTPUT_SEGMENTED, segmented)
-    cv2.imwrite(OUTPUT_BOUNDARY, boundary_image)
-    print("Saved:", OUTPUT_ORIGINAL, OUTPUT_MASK, OUTPUT_SEGMENTED, OUTPUT_BOUNDARY)
+    cv2.imwrite(output_mask, mask)
+    cv2.imwrite(output_segmented, segmented)
+    cv2.imwrite(output_boundary, boundary_image)
+    print("Saved:", OUTPUT_ORIGINAL, output_mask, output_segmented, output_boundary)
 
-    cv2.imshow("Final Human Mask", mask)
-    cv2.imshow("Final Segmented Human", segmented)
-    cv2.imshow("Final Human Boundary", boundary_image)
+    cv2.imshow("Final Mask", mask)
+    cv2.imshow("Final Segmented", segmented)
+    cv2.imshow("Final Boundary", boundary_image)
     print("Press any key to close.")
     cv2.waitKey(0)
     cv2.destroyAllWindows()
