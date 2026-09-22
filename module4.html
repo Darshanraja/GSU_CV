@@ -63,7 +63,9 @@
         <h3>Problem 1 - RGB Human Boundary Detection</h3>
         <p>
           Browser version of the working classical GrabCut workflow: capture →
-          rectangle → foreground/background refinement → contour.
+          rectangle → foreground/background refinement → contour. Do it twice on
+          the same image: once for the <b>whole body</b> and once for the
+          <b>face</b>.
         </p>
 
         <div class="form-row">
@@ -88,6 +90,18 @@
           <video id="rgbVideo" autoplay playsinline muted></video>
         </div>
 
+        <div class="form-row">
+          <div class="field">
+            <label for="rgbTarget">Segment</label>
+            <select id="rgbTarget">
+              <option value="body">
+                Whole body (box around the whole person)
+              </option>
+              <option value="face">Face (box around the head)</option>
+            </select>
+          </div>
+        </div>
+
         <div class="button-row">
           <button id="rgbRectMode">1. Draw Rectangle</button>
           <button id="rgbHumanMode" class="success-btn">2. Mark Human</button>
@@ -95,11 +109,12 @@
             3. Mark Background
           </button>
           <button id="rgbRefine">G - Refine</button>
-          <button id="rgbFinish">S - Finalize</button>
+          <button id="rgbFinish">S - Finalize &amp; Save</button>
         </div>
 
         <p id="rgbStatus" class="status">
-          Start the camera and capture an image. On macOS, select the iPhone
+          Start the camera and capture an image (or upload one). Choose what to
+          segment, then draw the rectangle. On macOS, select the iPhone
           Continuity Camera in the camera list if it appears.
         </p>
 
@@ -118,6 +133,7 @@
           </div>
         </div>
 
+        <h4>Whole Body Result</h4>
         <div class="results-box">
           <div class="stats-grid">
             <div><span>Contour Area</span><strong id="rgbArea">-</strong></div>
@@ -142,6 +158,37 @@
           <div class="image-card">
             <h4>Final Boundary</h4>
             <canvas id="rgbBoundaryCanvas"></canvas>
+          </div>
+        </div>
+
+        <h4>Face Result</h4>
+        <div class="results-box">
+          <div class="stats-grid">
+            <div>
+              <span>Contour Area</span><strong id="rgbFaceArea">-</strong>
+            </div>
+            <div>
+              <span>Boundary Length</span
+              ><strong id="rgbFacePerimeter">-</strong>
+            </div>
+            <div>
+              <span>Boundary Points</span><strong id="rgbFacePoints">-</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="image-grid">
+          <div class="image-card">
+            <h4>Final Mask</h4>
+            <canvas id="rgbFaceMaskCanvas"></canvas>
+          </div>
+          <div class="image-card">
+            <h4>Final Segmented Face</h4>
+            <canvas id="rgbFaceSegmentedCanvas"></canvas>
+          </div>
+          <div class="image-card">
+            <h4>Final Boundary</h4>
+            <canvas id="rgbFaceBoundaryCanvas"></canvas>
           </div>
         </div>
       </section>
@@ -245,8 +292,9 @@
           <div class="field">
             <label for="samTarget">Compare SAM2 Against</label>
             <select id="samTarget">
-              <option value="rgb">RGB classical mask</option>
-              <option value="thermal">Thermal classical mask</option>
+              <option value="rgb_body">RGB whole-body mask</option>
+              <option value="rgb_face">RGB face mask</option>
+              <option value="thermal">Thermal mask</option>
             </select>
           </div>
           <div class="field">

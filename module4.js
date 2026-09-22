@@ -12,7 +12,8 @@ let rgbMask = null; // GrabCut label mask
 let rgbSeedMask = null;
 let rgbBgModel = null;
 let rgbFgModel = null;
-let rgbFinalBinary = null;
+let rgbFinalMasks = { body: null, face: null }; // finished classical masks, one per target
+let rgbOriginalSaved = false;
 let rgbMode = "rect";
 let rgbRect = null;
 let rgbRectStart = null;
@@ -131,7 +132,9 @@ function largestComponent(binary) {
   return out;
 }
 
-// Port of build_initial_mask() from rgb_human_boundary.py.
+// Port of build_initial_mask() from rgb_human_boundary.py, with two modes.
+//
+// mode "body" (rectangle around the WHOLE person)
 //   1. outside the box                        -> sure background
 //   2. learn the background colour (Lab mean + covariance) from the two TOP CORNERS and the
 //      upper side edges of the box (top-centre is skipped: that is where the head is)
@@ -139,9 +142,19 @@ function largestComponent(binary) {
 //      everything else -> probable foreground
 //   4. background-coloured pixels touching top corners / upper sides  -> sure background
 //   5. torso prior: lower-middle of the box is never "background-coloured"
-//      (a light shirt is often close to a light wall)
 //   6. small ellipse in the middle of the box -> sure foreground
-function buildRgbSeedMask(rgb3, rect, thresh = 9.0, edgeFrac = 0.1) {
+//
+// mode "face" (rectangle around the HEAD only)
+//   A tight head box is mostly hair/face, so the background is ONLY in the corners of the box:
+//   sample the two top corners only, no side strips, no torso prior, core ellipse on the face.
+function buildRgbSeedMask(
+  rgb3,
+  rect,
+  mode = "body",
+  thresh = 9.0,
+  edgeFrac = 0.1,
+) {
+  const face = mode === "face";
   const H = rgb3.rows,
     W = rgb3.cols;
   const x0 = Math.max(0, rect.x),
@@ -160,16 +173,24 @@ function buildRgbSeedMask(rgb3, rect, thresh = 9.0, edgeFrac = 0.1) {
 
   const bw = Math.max(5, Math.floor(rw * edgeFrac));
   const bh = Math.max(5, Math.floor(rh * edgeFrac));
-  const cw = Math.max(1, Math.floor(rw * 0.25));
+  const cw = face
+    ? Math.max(5, Math.floor(rw * 0.1))
+    : Math.max(1, Math.floor(rw * 0.25));
+  const ch = face ? Math.max(5, Math.floor(rh * 0.08)) : bh * 2; // corner-sample height
   const sideH = Math.floor(rh * 0.5);
 
   // background sample regions, in box coordinates: [row0,row1,col0,col1]
-  const regions = [
-    [0, Math.min(rh, bh * 2), 0, Math.min(rw, cw)],
-    [0, Math.min(rh, bh * 2), Math.max(0, rw - cw), rw],
-    [0, Math.min(rh, sideH), 0, Math.min(rw, bw)],
-    [0, Math.min(rh, sideH), Math.max(0, rw - bw), rw],
-  ];
+  const regions = face
+    ? [
+        [0, Math.min(rh, ch), 0, Math.min(rw, cw)],
+        [0, Math.min(rh, ch), Math.max(0, rw - cw), rw],
+      ]
+    : [
+        [0, Math.min(rh, ch), 0, Math.min(rw, cw)],
+        [0, Math.min(rh, ch), Math.max(0, rw - cw), rw],
+        [0, Math.min(rh, sideH), 0, Math.min(rw, bw)],
+        [0, Math.min(rh, sideH), Math.max(0, rw - bw), rw],
+      ];
 
   // mean + (unbiased) covariance of the sampled Lab values
   let n = 0;
@@ -231,28 +252,29 @@ function buildRgbSeedMask(rgb3, rect, thresh = 9.0, edgeFrac = 0.1) {
         2 * (inv[0][1] * dx * dy + inv[0][2] * dx * dz + inv[1][2] * dy * dz);
 
       let likelyBg = maha2 < thresh;
-      if (r >= torsoR0 && c >= torsoC0 && c < torsoC1) likelyBg = false;
+      if (!face && r >= torsoR0 && c >= torsoC0 && c < torsoC1)
+        likelyBg = false;
 
       let v = likelyBg ? cv.GC_PR_BGD : cv.GC_PR_FGD;
-      if (
-        likelyBg &&
-        ((r < bh && c < cw) ||
+      const inSureBg = face
+        ? (r < ch && c < cw) || (r < ch && c >= rw - cw)
+        : (r < bh && c < cw) ||
           (r < bh && c >= rw - cw) ||
           (r < sideH && c < bw) ||
-          (r < sideH && c >= rw - bw))
-      ) {
-        v = cv.GC_BGD;
-      }
+          (r < sideH && c >= rw - bw);
+      if (likelyBg && inSureBg) v = cv.GC_BGD;
       M[(y0 + r) * W + (x0 + c)] = v;
     }
   }
 
   // sure-foreground core in the middle of the box
+  const coreY = face ? 0.55 : 0.6;
+  const coreW = face ? 0.12 : 0.1;
   cv.ellipse(
     mask,
-    new cv.Point(x0 + Math.floor(rw / 2), y0 + Math.floor(rh * 0.6)),
+    new cv.Point(x0 + Math.floor(rw / 2), y0 + Math.floor(rh * coreY)),
     new cv.Size(
-      Math.max(3, Math.floor(rw * 0.1)),
+      Math.max(3, Math.floor(rw * coreW)),
       Math.max(3, Math.floor(rh * 0.18)),
     ),
     0,
@@ -431,6 +453,7 @@ function setRgbSourceFromCanvas(canvas) {
   deleteMat(rgbSource3);
   rgbSource = work;
   rgbSource3 = rgbaToRgb(work);
+  clearRgbResults();
   resetRgbSegmentation();
   return `${work.cols}x${work.rows}`;
 }
@@ -482,6 +505,41 @@ function captureRgb() {
     `Captured (working size ${size}). Click Draw Rectangle, then drag tightly around the person.`;
 }
 
+// Which thing is being segmented right now: "body" (whole person) or "face" (head).
+function rgbTarget() {
+  return $("rgbTarget").value === "face" ? "face" : "body";
+}
+
+// A new image was loaded: forget the finished results of BOTH targets.
+function clearRgbResults() {
+  deleteMat(rgbFinalMasks.body);
+  rgbFinalMasks.body = null;
+  deleteMat(rgbFinalMasks.face);
+  rgbFinalMasks.face = null;
+  rgbOriginalSaved = false;
+  [
+    "rgbMaskCanvas",
+    "rgbSegmentedCanvas",
+    "rgbBoundaryCanvas",
+    "rgbFaceMaskCanvas",
+    "rgbFaceSegmentedCanvas",
+    "rgbFaceBoundaryCanvas",
+  ].forEach((id) => {
+    const c = $(id);
+    c.getContext("2d").clearRect(0, 0, c.width, c.height);
+  });
+  [
+    "rgbArea",
+    "rgbPerimeter",
+    "rgbPoints",
+    "rgbFaceArea",
+    "rgbFacePerimeter",
+    "rgbFacePoints",
+  ].forEach((id) => {
+    $(id).textContent = "-";
+  });
+}
+
 function resetRgbSegmentation() {
   deleteMat(rgbMask);
   rgbMask = null;
@@ -491,8 +549,6 @@ function resetRgbSegmentation() {
   rgbBgModel = null;
   deleteMat(rgbFgModel);
   rgbFgModel = null;
-  deleteMat(rgbFinalBinary);
-  rgbFinalBinary = null;
   rgbRect = null;
   rgbRectStart = null;
   rgbStrokes = [];
@@ -501,9 +557,6 @@ function resetRgbSegmentation() {
     cv.imshow("rgbCanvas", rgbSource);
     cv.imshow("rgbPreview", rgbSource);
   }
-  $("rgbArea").textContent = "-";
-  $("rgbPerimeter").textContent = "-";
-  $("rgbPoints").textContent = "-";
 }
 
 function canvasPoint(canvas, ev) {
@@ -520,7 +573,7 @@ async function initializeRgbGrabcut(rect) {
   if (!rgbSource3 || rgbBusy) return;
   rgbBusy = true;
   $("rgbStatus").textContent =
-    "Auto-seeding and running GrabCut... (a few seconds)";
+    `Auto-seeding (${rgbTarget() === "face" ? "face" : "whole body"}) and running GrabCut... (a few seconds)`;
   await nextTick(); // let the browser repaint the status text
 
   try {
@@ -531,7 +584,7 @@ async function initializeRgbGrabcut(rect) {
     rgbStrokes = [];
 
     // NOT "whole rectangle = foreground": seed from the box's own colour statistics.
-    rgbMask = buildRgbSeedMask(rgbSource3, rect);
+    rgbMask = buildRgbSeedMask(rgbSource3, rect, rgbTarget());
     rgbSeedMask = rgbMask.clone();
 
     rgbBgModel = new cv.Mat();
@@ -680,9 +733,12 @@ async function refineRgb() {
 
 function finalizeRgb() {
   if (!rgbMask) {
-    $("rgbStatus").textContent = "Draw the person rectangle first.";
+    $("rgbStatus").textContent = "Draw the rectangle first.";
     return;
   }
+
+  const target = rgbTarget(); // "body" or "face"
+  const P = target === "face" ? "rgbFace" : "rgb"; // element-id prefix ("rgb..." = whole body)
 
   const raw = binaryFromGrabcut(rgbMask);
   const largest = largestComponent(raw);
@@ -693,21 +749,38 @@ function finalizeRgb() {
   cv.morphologyEx(largest, closed, cv.MORPH_CLOSE, kernel);
   const cleaned = fillExternalContours(closed);
 
-  deleteMat(rgbFinalBinary);
-  rgbFinalBinary = cleaned.clone();
+  deleteMat(rgbFinalMasks[target]);
+  rgbFinalMasks[target] = cleaned.clone();
 
   const seg = segmentedRGBA(rgbSource, cleaned);
   const boundary = drawBoundary(rgbSource, cleaned);
 
-  cv.imshow("rgbMaskCanvas", cleaned);
-  cv.imshow("rgbSegmentedCanvas", seg);
-  cv.imshow("rgbBoundaryCanvas", boundary.out);
+  cv.imshow(P + "MaskCanvas", cleaned);
+  cv.imshow(P + "SegmentedCanvas", seg);
+  cv.imshow(P + "BoundaryCanvas", boundary.out);
 
-  $("rgbArea").textContent = boundary.area.toFixed(1) + " px";
-  $("rgbPerimeter").textContent = boundary.perimeter.toFixed(1) + " px";
-  $("rgbPoints").textContent = boundary.points;
+  $(P + "Area").textContent = boundary.area.toFixed(1) + " px";
+  $(P + "Perimeter").textContent = boundary.perimeter.toFixed(1) + " px";
+  $(P + "Points").textContent = boundary.points;
 
-  $("rgbStatus").textContent = "RGB result finalized.";
+  // Download the same files the Python script writes (the original only once per image).
+  const files = [];
+  if (!rgbOriginalSaved) {
+    const original = document.createElement("canvas");
+    cv.imshow(original, rgbSource);
+    files.push(["rgb_original.png", original]);
+    rgbOriginalSaved = true;
+  }
+  files.push([`rgb_${target}_mask.png`, $(P + "MaskCanvas")]);
+  files.push([`rgb_${target}_segmented.png`, $(P + "SegmentedCanvas")]);
+  files.push([`rgb_${target}_boundary.png`, $(P + "BoundaryCanvas")]);
+  files.forEach(([name, canvas], i) =>
+    setTimeout(() => downloadCanvas(canvas, name), i * 300),
+  );
+
+  $("rgbStatus").textContent =
+    `${target === "face" ? "Face" : "Whole-body"} result finalized and saved (rgb_${target}_mask.png ...). ` +
+    `Switch "Segment" to ${target === "face" ? "Whole body" : "Face"} to do the other one on the same image.`;
 
   raw.delete();
   largest.delete();
@@ -728,7 +801,17 @@ $("rgbImageInput").addEventListener("change", (e) => {
 $("rgbReset").addEventListener("click", resetRgbSegmentation);
 $("rgbRectMode").addEventListener("click", () => {
   rgbMode = "rect";
-  $("rgbStatus").textContent = "Drag a rectangle around the person.";
+  $("rgbStatus").textContent =
+    rgbTarget() === "face"
+      ? "Drag a rectangle around the HEAD (hair to chin)."
+      : "Drag a rectangle around the WHOLE person.";
+});
+$("rgbTarget").addEventListener("change", () => {
+  resetRgbSegmentation(); // start a fresh rectangle for the other target (finished results are kept)
+  $("rgbStatus").textContent =
+    rgbTarget() === "face"
+      ? "Face: drag a rectangle around the HEAD (hair to chin)."
+      : "Whole body: drag a rectangle around the WHOLE person, head to bottom edge.";
 });
 $("rgbHumanMode").addEventListener("click", () => {
   rgbMode = "human";
@@ -1363,8 +1446,13 @@ function compareMasks() {
     return;
   }
 
+  const which = $("samTarget").value;
   const classical =
-    $("samTarget").value === "rgb" ? rgbFinalBinary : thermalFinalMask;
+    which === "rgb_body"
+      ? rgbFinalMasks.body
+      : which === "rgb_face"
+        ? rgbFinalMasks.face
+        : thermalFinalMask;
   if (!classical) {
     alert("Finalize the selected classical segmentation first.");
     return;
