@@ -61,6 +61,13 @@ let latestNewFrame = null;
 
 let previousCleanFrameImageData = null;
 
+// Best validation pair for the CURRENT video.
+// The best pair is retained even if the tracker loses points near the end.
+let currentVideoId = null;
+let currentBestValidation = null;
+
+const VALIDATION_SESSION_KEY = "module5_optical_flow_validation_results_v1";
+
 // Used for motion-mask generation
 let motionReferenceGray = null;
 let frameCounter = 0;
@@ -78,73 +85,542 @@ const FEATURE_BLOCK_SIZE = 7;
 
 
 // ============================================================
+// SESSION-STORAGE HELPERS FOR PROBLEM 1
+// ============================================================
+
+function getValidationSessionResults() {
+  try {
+    return JSON.parse(
+      sessionStorage.getItem(
+        VALIDATION_SESSION_KEY
+      ) || "{}"
+    );
+  } catch (error) {
+    return {};
+  }
+}
+
+
+function storeValidationForVideo(
+  videoId,
+  result
+) {
+  if (
+    !videoId ||
+    !result
+  ) {
+    return;
+  }
+
+  const allResults =
+    getValidationSessionResults();
+
+  allResults[videoId] =
+    result;
+
+  try {
+    sessionStorage.setItem(
+      VALIDATION_SESSION_KEY,
+      JSON.stringify(
+        allResults
+      )
+    );
+  } catch (error) {
+    console.warn(
+      "Could not store validation result in sessionStorage:",
+      error
+    );
+  }
+}
+
+
+function getStoredValidationForVideo(
+  videoId
+) {
+  if (
+    !videoId
+  ) {
+    return null;
+  }
+
+  const allResults =
+    getValidationSessionResults();
+
+  return (
+    allResults[videoId]
+    ||
+    null
+  );
+}
+
+
+function imageDataToDataURL(
+  imageData
+) {
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+  canvas.width =
+    imageData.width;
+
+  canvas.height =
+    imageData.height;
+
+  canvas
+    .getContext("2d")
+    .putImageData(
+      imageData,
+      0,
+      0
+    );
+
+  return canvas.toDataURL(
+    "image/jpeg",
+    0.88
+  );
+}
+
+
+function calculateValidationRows(
+  oldPoints,
+  newPoints
+) {
+  return oldPoints
+    .map(
+      (
+        oldPoint,
+        index
+      ) => {
+        const newPoint =
+          newPoints[index];
+
+        const dx =
+          newPoint.x
+          -
+          oldPoint.x;
+
+        const dy =
+          newPoint.y
+          -
+          oldPoint.y;
+
+        const magnitude =
+          Math.hypot(
+            dx,
+            dy
+          );
+
+        return {
+          oldPoint,
+          newPoint,
+          dx,
+          dy,
+          magnitude
+        };
+      }
+    )
+    .sort(
+      (
+        a,
+        b
+      ) =>
+        b.magnitude
+        -
+        a.magnitude
+    )
+    .slice(
+      0,
+      10
+    );
+}
+
+
+function considerBestValidationPair(
+  oldFrame,
+  newFrame,
+  oldPoints,
+  newPoints
+) {
+  if (
+    !oldFrame ||
+    !newFrame ||
+    oldPoints.length === 0 ||
+    oldPoints.length !== newPoints.length
+  ) {
+    return;
+  }
+
+  const rows =
+    calculateValidationRows(
+      oldPoints,
+      newPoints
+    );
+
+  if (
+    rows.length === 0
+  ) {
+    return;
+  }
+
+  // Score = average displacement of the strongest tracked points.
+  const score =
+    rows.reduce(
+      (
+        sum,
+        row
+      ) =>
+        sum
+        +
+        row.magnitude,
+      0
+    )
+    /
+    rows.length;
+
+  // Ignore effectively motionless pairs.
+  if (
+    score < 0.02
+  ) {
+    return;
+  }
+
+  if (
+    !currentBestValidation
+    ||
+    score > currentBestValidation.score
+  ) {
+    currentBestValidation = {
+      score,
+      frame1:
+        imageDataToDataURL(
+          oldFrame
+        ),
+      frame2:
+        imageDataToDataURL(
+          newFrame
+        ),
+      rows
+    };
+
+    // Persist every new best pair for this browser session.
+    storeValidationForVideo(
+      currentVideoId,
+      currentBestValidation
+    );
+  }
+}
+
+
+async function drawDataURLToCanvas(
+  dataURL,
+  canvas
+) {
+  return new Promise(
+    (
+      resolve,
+      reject
+    ) => {
+      const image =
+        new Image();
+
+      image.onload =
+        () => {
+          canvas.width =
+            image.naturalWidth;
+
+          canvas.height =
+            image.naturalHeight;
+
+          canvas
+            .getContext("2d")
+            .drawImage(
+              image,
+              0,
+              0
+            );
+
+          resolve();
+        };
+
+      image.onerror =
+        reject;
+
+      image.src =
+        dataURL;
+    }
+  );
+}
+
+
+async function renderValidationResult(
+  result
+) {
+  if (
+    !result ||
+    !result.frame1 ||
+    !result.frame2 ||
+    !result.rows
+  ) {
+    return;
+  }
+
+  const canvas1 =
+    $("validation1");
+
+  const canvas2 =
+    $("validation2");
+
+  await Promise.all([
+    drawDataURLToCanvas(
+      result.frame1,
+      canvas1
+    ),
+    drawDataURLToCanvas(
+      result.frame2,
+      canvas2
+    )
+  ]);
+
+  const context1 =
+    canvas1.getContext(
+      "2d"
+    );
+
+  const context2 =
+    canvas2.getContext(
+      "2d"
+    );
+
+  result.rows.forEach(
+    (
+      row,
+      index
+    ) => {
+      drawNumberedPoint(
+        context1,
+        row.oldPoint.x,
+        row.oldPoint.y,
+        index + 1,
+        "#00ff55"
+      );
+
+      drawNumberedPoint(
+        context2,
+        row.newPoint.x,
+        row.newPoint.y,
+        index + 1,
+        "#ff3030"
+      );
+    }
+  );
+
+  $("validationTable").innerHTML =
+    result.rows
+      .map(
+        (
+          row,
+          index
+        ) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${row.oldPoint.x.toFixed(2)}</td>
+            <td>${row.oldPoint.y.toFixed(2)}</td>
+            <td>${row.newPoint.x.toFixed(2)}</td>
+            <td>${row.newPoint.y.toFixed(2)}</td>
+            <td>${row.dx.toFixed(2)}</td>
+            <td>${row.dy.toFixed(2)}</td>
+            <td>${row.magnitude.toFixed(2)}</td>
+          </tr>
+        `
+      )
+      .join("");
+}
+
+
+// ============================================================
 // LOAD PRELOADED VIDEOS
 // ============================================================
 
-document.querySelectorAll(".load-video").forEach(button => {
-  button.addEventListener("click", () => {
-    loadVideo(button.dataset.video);
-  });
-});
+document
+  .querySelectorAll(
+    ".load-video"
+  )
+  .forEach(
+    button => {
+      button.addEventListener(
+        "click",
+        () => {
+          const source =
+            button.dataset.video;
+
+          loadVideo(
+            source,
+            `preloaded:${source}`
+          );
+        }
+      );
+    }
+  );
 
 
 // ============================================================
 // UPLOAD VIDEO
 // ============================================================
 
-$("videoUpload").addEventListener("change", event => {
-  const file = event.target.files[0];
+$("videoUpload")
+  .addEventListener(
+    "change",
+    event => {
+      const file =
+        event.target.files[0];
 
-  if (!file) {
-    return;
-  }
+      if (
+        !file
+      ) {
+        return;
+      }
 
-  const url = URL.createObjectURL(file);
+      const source =
+        URL.createObjectURL(
+          file
+        );
 
-  loadVideo(url);
-});
+      const videoId =
+        `upload:${file.name}:${file.size}:${file.lastModified}`;
+
+      loadVideo(
+        source,
+        videoId
+      );
+    }
+  );
 
 
 // ============================================================
 // LOAD VIDEO
 // ============================================================
 
-function loadVideo(source) {
+function loadVideo(
+  source,
+  videoId = source
+) {
+  // Preserve the current video's best result before switching.
+  if (
+    currentVideoId &&
+    currentBestValidation
+  ) {
+    storeValidationForVideo(
+      currentVideoId,
+      currentBestValidation
+    );
+  }
+
   stopFlow();
 
-  const video = $("sourceVideo");
+  currentVideoId =
+    videoId;
 
-  video.src = source;
+  currentBestValidation =
+    getStoredValidationForVideo(
+      currentVideoId
+    );
+
+  const video =
+    $("sourceVideo");
+
+  video.src =
+    source;
+
   video.load();
 
-  video.onloadedmetadata = () => {
-    $("videoInfo").innerHTML = [
-      ["Duration", `${video.duration.toFixed(2)} sec`],
-      ["Resolution", `${video.videoWidth} × ${video.videoHeight}`],
-      ["Status", "Ready"],
-      ["Method", "Motion Mask + Lucas-Kanade"]
-    ]
-      .map(
-        item => `
-          <div class="info-box">
-            ${item[0]}
-            <b>${item[1]}</b>
-          </div>
-        `
-      )
-      .join("");
+  video.onloadedmetadata =
+    async () => {
+      $("videoInfo").innerHTML = [
+        [
+          "Duration",
+          `${video.duration.toFixed(2)} sec`
+        ],
+        [
+          "Resolution",
+          `${video.videoWidth} × ${video.videoHeight}`
+        ],
+        [
+          "Status",
+          "Ready"
+        ],
+        [
+          "Method",
+          "Motion Mask + Lucas-Kanade"
+        ]
+      ]
+        .map(
+          item => `
+            <div class="info-box">
+              ${item[0]}
+              <b>${item[1]}</b>
+            </div>
+          `
+        )
+        .join("");
 
-    const flowCanvas = $("flowCanvas");
+      const flowCanvas =
+        $("flowCanvas");
 
-    flowCanvas.width = video.videoWidth;
-    flowCanvas.height = video.videoHeight;
+      flowCanvas.width =
+        video.videoWidth;
 
-    $("validation1").width = video.videoWidth;
-    $("validation1").height = video.videoHeight;
+      flowCanvas.height =
+        video.videoHeight;
 
-    $("validation2").width = video.videoWidth;
-    $("validation2").height = video.videoHeight;
-  };
+      $("validation1").width =
+        video.videoWidth;
+
+      $("validation1").height =
+        video.videoHeight;
+
+      $("validation2").width =
+        video.videoWidth;
+
+      $("validation2").height =
+        video.videoHeight;
+
+      // If this video was already processed during this browser session,
+      // immediately restore its saved validation pair.
+      if (
+        currentBestValidation
+      ) {
+        await renderValidationResult(
+          currentBestValidation
+        );
+      } else {
+        const c1 =
+          $("validation1")
+            .getContext("2d");
+
+        const c2 =
+          $("validation2")
+            .getContext("2d");
+
+        c1.clearRect(
+          0,
+          0,
+          $("validation1").width,
+          $("validation1").height
+        );
+
+        c2.clearRect(
+          0,
+          0,
+          $("validation2").width,
+          $("validation2").height
+        );
+
+        $("validationTable").innerHTML =
+          "";
+      }
+    };
 }
 
 
@@ -641,6 +1117,16 @@ async function startFlow() {
     latestNewFrame =
       cleanImageData;
 
+    // Keep the strongest valid pair seen anywhere in this video.
+    // This prevents the 29-second video from losing its result
+    // if tracking disappears on the final frames.
+    considerBestValidationPair(
+      latestOldFrame,
+      latestNewFrame,
+      latestOldPoints,
+      latestNewPoints
+    );
+
     // --------------------------------------------------------
     // KEEP ONLY VALID MOTION POINTS
     // --------------------------------------------------------
@@ -778,13 +1264,16 @@ function drawMotionMaskOverlay(
 function stopFlow() {
   flowRunning = false;
 
-  if (flowTimer) {
+  if (
+    flowTimer
+  ) {
     cancelAnimationFrame(
       flowTimer
     );
   }
 
-  flowTimer = null;
+  flowTimer =
+    null;
 
   const video =
     $("sourceVideo");
@@ -796,6 +1285,16 @@ function stopFlow() {
     video.pause();
   }
 
+  if (
+    currentVideoId &&
+    currentBestValidation
+  ) {
+    storeValidationForVideo(
+      currentVideoId,
+      currentBestValidation
+    );
+  }
+
   clearFlowMats();
 }
 
@@ -805,151 +1304,29 @@ function stopFlow() {
 // ============================================================
 
 function captureValidationPair() {
+  const saved =
+    currentBestValidation
+    ||
+    getStoredValidationForVideo(
+      currentVideoId
+    );
+
   if (
-    !latestOldFrame ||
-    !latestNewFrame ||
-    latestOldPoints.length === 0
+    !saved
   ) {
     alert(
-      "Start optical flow first and wait until moving points are tracked."
+      "No valid moving-point pair has been saved yet. Start optical flow and let it track motion for a few seconds."
     );
 
     return;
   }
 
-  const canvas1 =
-    $("validation1");
+  currentBestValidation =
+    saved;
 
-  const canvas2 =
-    $("validation2");
-
-  const context1 =
-    canvas1.getContext("2d");
-
-  const context2 =
-    canvas2.getContext("2d");
-
-  // Show CLEAN underlying frames.
-  context1.putImageData(
-    latestOldFrame,
-    0,
-    0
+  renderValidationResult(
+    saved
   );
-
-  context2.putImageData(
-    latestNewFrame,
-    0,
-    0
-  );
-
-  // Compute displacement and choose largest-moving points.
-  const rows =
-    latestOldPoints
-      .map(
-        (
-          oldPoint,
-          index
-        ) => {
-          const newPoint =
-            latestNewPoints[index];
-
-          const dx =
-            newPoint.x -
-            oldPoint.x;
-
-          const dy =
-            newPoint.y -
-            oldPoint.y;
-
-          const magnitude =
-            Math.hypot(
-              dx,
-              dy
-            );
-
-          return {
-            oldPoint,
-            newPoint,
-            dx,
-            dy,
-            magnitude
-          };
-        }
-      )
-      .sort(
-        (a, b) =>
-          b.magnitude -
-          a.magnitude
-      )
-      .slice(
-        0,
-        10
-      );
-
-  rows.forEach(
-    (
-      row,
-      index
-    ) => {
-      drawNumberedPoint(
-        context1,
-        row.oldPoint.x,
-        row.oldPoint.y,
-        index + 1,
-        "#00ff55"
-      );
-
-      drawNumberedPoint(
-        context2,
-        row.newPoint.x,
-        row.newPoint.y,
-        index + 1,
-        "#ff3030"
-      );
-    }
-  );
-
-  $("validationTable").innerHTML =
-    rows
-      .map(
-        (
-          row,
-          index
-        ) => `
-          <tr>
-            <td>${index + 1}</td>
-
-            <td>
-              ${row.oldPoint.x.toFixed(2)}
-            </td>
-
-            <td>
-              ${row.oldPoint.y.toFixed(2)}
-            </td>
-
-            <td>
-              ${row.newPoint.x.toFixed(2)}
-            </td>
-
-            <td>
-              ${row.newPoint.y.toFixed(2)}
-            </td>
-
-            <td>
-              ${row.dx.toFixed(2)}
-            </td>
-
-            <td>
-              ${row.dy.toFixed(2)}
-            </td>
-
-            <td>
-              ${row.magnitude.toFixed(2)}
-            </td>
-          </tr>
-        `
-      )
-      .join("");
 }
 
 
@@ -1370,11 +1747,781 @@ $("reconstructBook").addEventListener(
 
 
 // ============================================================
+// CALIBRATED CAMERA PARAMETERS
+// Source: user's OpenCV checkerboard calibration at 1920 x 1080
+// ============================================================
+
+const CAMERA_CALIBRATION = {
+  fx: 2301.4244,
+  fy: 2304.4655,
+  cx: 973.7959,
+  cy: 494.0908,
+  width: 1920,
+  height: 1080
+};
+
+
+// Estimate the physical cover aspect ratio from the four clicked
+// quadrilaterals. This avoids inventing a book width/height.
+// Object width is then defined as 1 normalized unit.
+function estimateBookAspectRatio() {
+  const ratios =
+    bookImages.map(
+      item => {
+        const p =
+          item.points;
+
+        const distance =
+          (
+            a,
+            b
+          ) =>
+            Math.hypot(
+              b.x - a.x,
+              b.y - a.y
+            );
+
+        const width =
+          (
+            distance(
+              p[0],
+              p[1]
+            )
+            +
+            distance(
+              p[3],
+              p[2]
+            )
+          )
+          /
+          2;
+
+        const height =
+          (
+            distance(
+              p[0],
+              p[3]
+            )
+            +
+            distance(
+              p[1],
+              p[2]
+            )
+          )
+          /
+          2;
+
+        return (
+          width
+          /
+          height
+        );
+      }
+    )
+    .filter(
+      value =>
+        Number.isFinite(
+          value
+        )
+        &&
+        value > 0.2
+        &&
+        value < 2.0
+    )
+    .sort(
+      (
+        a,
+        b
+      ) =>
+        a - b
+    );
+
+  if (
+    ratios.length === 0
+  ) {
+    return 2 / 3;
+  }
+
+  const mid =
+    Math.floor(
+      ratios.length / 2
+    );
+
+  if (
+    ratios.length % 2 === 1
+  ) {
+    return ratios[mid];
+  }
+
+  return (
+    ratios[mid - 1]
+    +
+    ratios[mid]
+  )
+  /
+  2;
+}
+
+
+// Scale the supplied 1920x1080 calibration to each image.
+// Portrait images are treated as a 90-degree clockwise rotation
+// of the calibrated landscape camera.
+function getCalibratedCameraMatrix(
+  imageWidth,
+  imageHeight
+) {
+  let fx;
+  let fy;
+  let cx;
+  let cy;
+  let note;
+
+  if (
+    imageWidth >= imageHeight
+  ) {
+    const sx =
+      imageWidth
+      /
+      CAMERA_CALIBRATION.width;
+
+    const sy =
+      imageHeight
+      /
+      CAMERA_CALIBRATION.height;
+
+    fx =
+      CAMERA_CALIBRATION.fx
+      *
+      sx;
+
+    fy =
+      CAMERA_CALIBRATION.fy
+      *
+      sy;
+
+    cx =
+      CAMERA_CALIBRATION.cx
+      *
+      sx;
+
+    cy =
+      CAMERA_CALIBRATION.cy
+      *
+      sy;
+
+    note =
+      "Landscape calibration scaled from 1920x1080.";
+  } else {
+    // Rotate calibrated intrinsics into portrait coordinates.
+    const rotatedWidth =
+      CAMERA_CALIBRATION.height;
+
+    const rotatedHeight =
+      CAMERA_CALIBRATION.width;
+
+    const rotatedFx =
+      CAMERA_CALIBRATION.fy;
+
+    const rotatedFy =
+      CAMERA_CALIBRATION.fx;
+
+    const rotatedCx =
+      CAMERA_CALIBRATION.height
+      -
+      1
+      -
+      CAMERA_CALIBRATION.cy;
+
+    const rotatedCy =
+      CAMERA_CALIBRATION.cx;
+
+    const sx =
+      imageWidth
+      /
+      rotatedWidth;
+
+    const sy =
+      imageHeight
+      /
+      rotatedHeight;
+
+    fx =
+      rotatedFx
+      *
+      sx;
+
+    fy =
+      rotatedFy
+      *
+      sy;
+
+    cx =
+      rotatedCx
+      *
+      sx;
+
+    cy =
+      rotatedCy
+      *
+      sy;
+
+    note =
+      "Portrait image: 1920x1080 calibration rotated 90 degrees clockwise, then scaled.";
+  }
+
+  const K =
+    cv.matFromArray(
+      3,
+      3,
+      cv.CV_64F,
+      [
+        fx,
+        0,
+        cx,
+
+        0,
+        fy,
+        cy,
+
+        0,
+        0,
+        1
+      ]
+    );
+
+  return {
+    K,
+    fx,
+    fy,
+    cx,
+    cy,
+    note
+  };
+}
+
+
+function estimateCameraPoseForView(
+  item,
+  aspectRatio,
+  viewIndex
+) {
+  // Width is 1 normalized cover unit.
+  // Height is determined from the measured image aspect ratio.
+  // Translation and camera center are therefore reported in
+  // normalized cover-width units (not centimeters).
+  const objectWidth =
+    1.0;
+
+  const objectHeight =
+    1.0
+    /
+    aspectRatio;
+
+  const objectPoints =
+    cv.matFromArray(
+      4,
+      3,
+      cv.CV_64F,
+      [
+        0,
+        0,
+        0,
+
+        objectWidth,
+        0,
+        0,
+
+        objectWidth,
+        objectHeight,
+        0,
+
+        0,
+        objectHeight,
+        0
+      ]
+    );
+
+  const imagePoints =
+    cv.matFromArray(
+      4,
+      2,
+      cv.CV_64F,
+      item.points.flatMap(
+        point => [
+          point.x,
+          point.y
+        ]
+      )
+    );
+
+  const calibration =
+    getCalibratedCameraMatrix(
+      item.image.naturalWidth,
+      item.image.naturalHeight
+    );
+
+  // Distortion coefficients were not supplied in the current
+  // calibration values, so zero distortion is used here.
+  const distortion =
+    cv.Mat.zeros(
+      4,
+      1,
+      cv.CV_64F
+    );
+
+  const rvec =
+    new cv.Mat();
+
+  const tvec =
+    new cv.Mat();
+
+  let success =
+    false;
+
+  // IPPE is specifically designed for coplanar points.
+  if (
+    typeof cv.SOLVEPNP_IPPE !== "undefined"
+  ) {
+    try {
+      success =
+        cv.solvePnP(
+          objectPoints,
+          imagePoints,
+          calibration.K,
+          distortion,
+          rvec,
+          tvec,
+          false,
+          cv.SOLVEPNP_IPPE
+        );
+    } catch (error) {
+      success =
+        false;
+    }
+  }
+
+  // Fallback for OpenCV.js builds without IPPE support.
+  if (
+    !success
+  ) {
+    success =
+      cv.solvePnP(
+        objectPoints,
+        imagePoints,
+        calibration.K,
+        distortion,
+        rvec,
+        tvec,
+        false,
+        cv.SOLVEPNP_ITERATIVE
+      );
+  }
+
+  if (
+    !success
+  ) {
+    objectPoints.delete();
+    imagePoints.delete();
+    calibration.K.delete();
+    distortion.delete();
+    rvec.delete();
+    tvec.delete();
+
+    throw new Error(
+      `Camera pose estimation failed for View ${viewIndex}.`
+    );
+  }
+
+  const rotation =
+    new cv.Mat();
+
+  cv.Rodrigues(
+    rvec,
+    rotation
+  );
+
+  const R =
+    Array.from(
+      rotation.data64F
+    );
+
+  const t =
+    Array.from(
+      tvec.data64F
+    );
+
+  // Camera center in object-plane coordinates:
+  // C = -R^T t
+  const cameraCenter = [
+    -(
+      R[0] * t[0]
+      +
+      R[3] * t[1]
+      +
+      R[6] * t[2]
+    ),
+
+    -(
+      R[1] * t[0]
+      +
+      R[4] * t[1]
+      +
+      R[7] * t[2]
+    ),
+
+    -(
+      R[2] * t[0]
+      +
+      R[5] * t[1]
+      +
+      R[8] * t[2]
+    )
+  ];
+
+  const result = {
+    viewIndex,
+    imageWidth:
+      item.image.naturalWidth,
+    imageHeight:
+      item.image.naturalHeight,
+    fx:
+      calibration.fx,
+    fy:
+      calibration.fy,
+    cx:
+      calibration.cx,
+    cy:
+      calibration.cy,
+    calibrationNote:
+      calibration.note,
+    R,
+    t,
+    cameraCenter
+  };
+
+  objectPoints.delete();
+  imagePoints.delete();
+  calibration.K.delete();
+  distortion.delete();
+  rvec.delete();
+  tvec.delete();
+  rotation.delete();
+
+  return result;
+}
+
+
+function ensureCameraPoseSection() {
+  let section =
+    $("cameraPoseSection");
+
+  if (
+    section
+  ) {
+    return section;
+  }
+
+  section =
+    document.createElement(
+      "div"
+    );
+
+  section.id =
+    "cameraPoseSection";
+
+  section.innerHTML = `
+    <h3>Calibrated Camera Parameters and Estimated Camera Poses</h3>
+
+    <p>
+      Camera intrinsics use the supplied OpenCV calibration:
+      fx = 2301.4244, fy = 2304.4655,
+      cx = 973.7959, cy = 494.0908 at 1920 × 1080.
+      Translation is reported in normalized cover-width units because
+      the physical book dimensions were not supplied.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>View</th>
+            <th>fx</th>
+            <th>fy</th>
+            <th>cx</th>
+            <th>cy</th>
+            <th>Cx</th>
+            <th>Cy</th>
+            <th>Cz</th>
+          </tr>
+        </thead>
+
+        <tbody id="cameraPoseTable"></tbody>
+      </table>
+    </div>
+
+    <canvas
+      id="cameraPoseCanvas"
+      width="800"
+      height="420"
+      style="margin-top:16px; background:white;"
+    ></canvas>
+
+    <pre id="cameraPoseOutput"></pre>
+  `;
+
+  $("homographyOutput")
+    .appendChild(
+      section
+    );
+
+  return section;
+}
+
+
+function drawCameraPosePlot(
+  poses,
+  aspectRatio
+) {
+  const canvas =
+    $("cameraPoseCanvas");
+
+  const context =
+    canvas.getContext(
+      "2d"
+    );
+
+  const width =
+    canvas.width;
+
+  const height =
+    canvas.height;
+
+  context.clearRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+  context.fillStyle =
+    "#ffffff";
+
+  context.fillRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+  const centers =
+    poses.map(
+      pose =>
+        pose.cameraCenter
+    );
+
+  const allX = [
+    0,
+    1,
+    ...centers.map(
+      c => c[0]
+    )
+  ];
+
+  const allZ = [
+    0,
+    ...centers.map(
+      c => c[2]
+    )
+  ];
+
+  let minX =
+    Math.min(
+      ...allX
+    );
+
+  let maxX =
+    Math.max(
+      ...allX
+    );
+
+  let minZ =
+    Math.min(
+      ...allZ
+    );
+
+  let maxZ =
+    Math.max(
+      ...allZ
+    );
+
+  if (
+    Math.abs(
+      maxX - minX
+    ) < 0.1
+  ) {
+    minX -= 1;
+    maxX += 1;
+  }
+
+  if (
+    Math.abs(
+      maxZ - minZ
+    ) < 0.1
+  ) {
+    minZ -= 1;
+    maxZ += 1;
+  }
+
+  const pad =
+    50;
+
+  const mapX =
+    x =>
+      pad
+      +
+      (
+        x - minX
+      )
+      /
+      (
+        maxX - minX
+      )
+      *
+      (
+        width - 2 * pad
+      );
+
+  const mapZ =
+    z =>
+      height
+      -
+      pad
+      -
+      (
+        z - minZ
+      )
+      /
+      (
+        maxZ - minZ
+      )
+      *
+      (
+        height - 2 * pad
+      );
+
+  // Object plane shown in top-down X-Z view at Z = 0.
+  context.strokeStyle =
+    "#00aa44";
+
+  context.lineWidth =
+    5;
+
+  context.beginPath();
+
+  context.moveTo(
+    mapX(0),
+    mapZ(0)
+  );
+
+  context.lineTo(
+    mapX(1),
+    mapZ(0)
+  );
+
+  context.stroke();
+
+  context.fillStyle =
+    "#006b2f";
+
+  context.font =
+    "14px Arial";
+
+  context.fillText(
+    "Book plane (normalized width = 1)",
+    mapX(0),
+    mapZ(0) - 12
+  );
+
+  poses.forEach(
+    pose => {
+      const center =
+        pose.cameraCenter;
+
+      const x =
+        mapX(
+          center[0]
+        );
+
+      const z =
+        mapZ(
+          center[2]
+        );
+
+      context.fillStyle =
+        "#0039A6";
+
+      context.beginPath();
+
+      context.arc(
+        x,
+        z,
+        8,
+        0,
+        Math.PI * 2
+      );
+
+      context.fill();
+
+      context.fillStyle =
+        "#111827";
+
+      context.fillText(
+        `Camera ${pose.viewIndex}`,
+        x + 10,
+        z - 8
+      );
+
+      context.strokeStyle =
+        "#8a94a3";
+
+      context.lineWidth =
+        1;
+
+      context.beginPath();
+
+      context.moveTo(
+        x,
+        z
+      );
+
+      context.lineTo(
+        mapX(0.5),
+        mapZ(0)
+      );
+
+      context.stroke();
+    }
+  );
+
+  context.fillStyle =
+    "#4b5563";
+
+  context.fillText(
+    "Top-down X-Z view; camera positions are relative and scaled in cover-width units.",
+    20,
+    height - 15
+  );
+}
+
+
+// ============================================================
 // PLANAR RECONSTRUCTION
 // ============================================================
 
 function reconstructBook() {
-  if (!cvReady) {
+  if (
+    !cvReady
+  ) {
     alert(
       "OpenCV.js is still loading."
     );
@@ -1405,16 +2552,29 @@ function reconstructBook() {
     return;
   }
 
+  // ========================================================
+  // ESTIMATE PLANAR COVER ASPECT RATIO
+  // ========================================================
 
-  // --------------------------------------------------------
-  // Reference plane
-  // --------------------------------------------------------
+  const aspectRatio =
+    estimateBookAspectRatio();
 
-  const referenceWidth =
+  // Preserve a natural portrait shape instead of forcing 600x400.
+  const referenceHeight =
     600;
 
-  const referenceHeight =
-    400;
+  const referenceWidth =
+    Math.max(
+      280,
+      Math.min(
+        700,
+        Math.round(
+          referenceHeight
+          *
+          aspectRatio
+        )
+      )
+    );
 
   const referencePoints =
     cv.matFromArray(
@@ -1436,9 +2596,14 @@ function reconstructBook() {
       ]
     );
 
+  const warpedMats =
+    [];
 
-  const warpedMats = [];
-  const homographyMatrices = [];
+  const homographyMatrices =
+    [];
+
+  const coordinateRows =
+    [];
 
   const rectifiedContainer =
     $("rectifiedViews");
@@ -1446,11 +2611,38 @@ function reconstructBook() {
   rectifiedContainer.innerHTML =
     "";
 
-  const coordinateRows = [];
+  // ========================================================
+  // CAMERA POSE ESTIMATION USING CALIBRATED K
+  // ========================================================
 
+  const cameraPoses =
+    [];
+
+  for (
+    let viewIndex = 0;
+    viewIndex < bookImages.length;
+    viewIndex++
+  ) {
+    try {
+      const pose =
+        estimateCameraPoseForView(
+          bookImages[viewIndex],
+          aspectRatio,
+          viewIndex + 1
+        );
+
+      cameraPoses.push(
+        pose
+      );
+    } catch (error) {
+      console.warn(
+        error
+      );
+    }
+  }
 
   // ========================================================
-  // HOMOGRAPHY FOR EACH VIEW
+  // HOMOGRAPHY RECTIFICATION FOR EACH VIEW
   // ========================================================
 
   bookImages.forEach(
@@ -1479,12 +2671,10 @@ function reconstructBook() {
           0
         );
 
-
       const sourceMat =
         cv.imread(
           sourceCanvas
         );
-
 
       const sourcePoints =
         cv.matFromArray(
@@ -1499,13 +2689,11 @@ function reconstructBook() {
           )
         );
 
-
       const homography =
         cv.getPerspectiveTransform(
           sourcePoints,
           referencePoints
         );
-
 
       homographyMatrices.push(
         Array.from(
@@ -1513,10 +2701,8 @@ function reconstructBook() {
         )
       );
 
-
       const warped =
         new cv.Mat();
-
 
       cv.warpPerspective(
         sourceMat,
@@ -1536,14 +2722,12 @@ function reconstructBook() {
         )
       );
 
-
       warpedMats.push(
         warped
       );
 
-
       // ----------------------------------------------------
-      // Display rectified image
+      // Display each rectified view
       // ----------------------------------------------------
 
       const card =
@@ -1573,9 +2757,8 @@ function reconstructBook() {
         warped
       );
 
-
       // ----------------------------------------------------
-      // Coordinates
+      // Save clicked image coordinates
       // ----------------------------------------------------
 
       const cornerNames = [
@@ -1602,19 +2785,14 @@ function reconstructBook() {
         }
       );
 
-
       sourceMat.delete();
       sourcePoints.delete();
       homography.delete();
     }
   );
 
-
   // ========================================================
-  // MEDIAN FUSION
-  //
-  // This replaces simple averaging.
-  // It reduces ghosting from small alignment differences.
+  // MEDIAN FUSION OF RECTIFIED VIEWS
   // ========================================================
 
   const reconstructed =
@@ -1624,11 +2802,10 @@ function reconstructBook() {
       cv.CV_8UC4
     );
 
-
   const totalPixels =
-    referenceWidth *
+    referenceWidth
+    *
     referenceHeight;
-
 
   for (
     let pixelIndex = 0;
@@ -1636,8 +2813,9 @@ function reconstructBook() {
     pixelIndex++
   ) {
     const base =
-      pixelIndex * 4;
-
+      pixelIndex
+      *
+      4;
 
     for (
       let channel = 0;
@@ -1648,15 +2826,12 @@ function reconstructBook() {
         warpedMats[0].data[
           base + channel
         ],
-
         warpedMats[1].data[
           base + channel
         ],
-
         warpedMats[2].data[
           base + channel
         ],
-
         warpedMats[3].data[
           base + channel
         ]
@@ -1669,13 +2844,13 @@ function reconstructBook() {
             a - b
         );
 
-
       reconstructed.data[
         base + channel
       ] =
         Math.round(
           (
-            values[1] +
+            values[1]
+            +
             values[2]
           )
           /
@@ -1684,24 +2859,17 @@ function reconstructBook() {
     }
   }
 
-
-  // ========================================================
-  // DISPLAY RECONSTRUCTED OBJECT
-  // ========================================================
-
   cv.imshow(
     "reconstructedCanvas",
     reconstructed
   );
 
-
   // ========================================================
-  // DRAW RECONSTRUCTED BOUNDARY
+  // CANONICAL PLANAR BOUNDARY
   // ========================================================
 
   const boundary =
     reconstructed.clone();
-
 
   cv.rectangle(
     boundary,
@@ -1722,12 +2890,35 @@ function reconstructBook() {
     5
   );
 
-
   cv.imshow(
     "boundaryCanvas",
     boundary
   );
 
+  // Add an explicit label so this is not misreported as a
+  // triangulated/automatically discovered 3D boundary.
+  if (
+    !$(
+      "canonicalBoundaryNote"
+    )
+  ) {
+    const note =
+      document.createElement(
+        "p"
+      );
+
+    note.id =
+      "canonicalBoundaryNote";
+
+    note.textContent =
+      "Green outline: canonical planar boundary obtained from the four corresponding cover corners. Camera poses below are estimated separately using the calibrated camera matrix.";
+
+    $("boundaryCanvas")
+      .parentElement
+      .appendChild(
+        note
+      );
+  }
 
   // ========================================================
   // HOMOGRAPHY MATRICES
@@ -1745,12 +2936,10 @@ function reconstructBook() {
               0,
               3
             ),
-
             matrix.slice(
               3,
               6
             ),
-
             matrix.slice(
               6,
               9
@@ -1784,7 +2973,6 @@ function reconstructBook() {
         "\n\n"
       );
 
-
   // ========================================================
   // SELECTED PIXEL COORDINATES
   // ========================================================
@@ -1804,6 +2992,74 @@ function reconstructBook() {
       )
       .join("");
 
+  // ========================================================
+  // DISPLAY CALIBRATED CAMERA POSES
+  // ========================================================
+
+  ensureCameraPoseSection();
+
+  $("cameraPoseTable").innerHTML =
+    cameraPoses
+      .map(
+        pose => `
+          <tr>
+            <td>${pose.viewIndex}</td>
+            <td>${pose.fx.toFixed(2)}</td>
+            <td>${pose.fy.toFixed(2)}</td>
+            <td>${pose.cx.toFixed(2)}</td>
+            <td>${pose.cy.toFixed(2)}</td>
+            <td>${pose.cameraCenter[0].toFixed(4)}</td>
+            <td>${pose.cameraCenter[1].toFixed(4)}</td>
+            <td>${pose.cameraCenter[2].toFixed(4)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+  $("cameraPoseOutput").textContent =
+    [
+      "BASE CAMERA CALIBRATION",
+      "K_calibrated =",
+      `[${CAMERA_CALIBRATION.fx}, 0, ${CAMERA_CALIBRATION.cx}]`,
+      `[0, ${CAMERA_CALIBRATION.fy}, ${CAMERA_CALIBRATION.cy}]`,
+      "[0, 0, 1]",
+      "",
+      `Calibration resolution: ${CAMERA_CALIBRATION.width} x ${CAMERA_CALIBRATION.height}`,
+      `Estimated planar cover aspect ratio (width / height): ${aspectRatio.toFixed(4)}`,
+      "Object-plane scale: width = 1 normalized cover-width unit.",
+      "Distortion: set to zero here because distortion coefficients were not supplied with the current calibration values.",
+      "",
+      ...cameraPoses.flatMap(
+        pose => [
+          `VIEW ${pose.viewIndex}`,
+          `Image resolution: ${pose.imageWidth} x ${pose.imageHeight}`,
+          `Scaled K =`,
+          `[${pose.fx.toFixed(4)}, 0, ${pose.cx.toFixed(4)}]`,
+          `[0, ${pose.fy.toFixed(4)}, ${pose.cy.toFixed(4)}]`,
+          `[0, 0, 1]`,
+          `Calibration handling: ${pose.calibrationNote}`,
+          "Rotation R =",
+          `[${pose.R.slice(0,3).map(v=>v.toFixed(6)).join(", ")}]`,
+          `[${pose.R.slice(3,6).map(v=>v.toFixed(6)).join(", ")}]`,
+          `[${pose.R.slice(6,9).map(v=>v.toFixed(6)).join(", ")}]`,
+          `Translation t = [${pose.t.map(v=>v.toFixed(6)).join(", ")}]`,
+          `Camera center C = -R^T t = [${pose.cameraCenter.map(v=>v.toFixed(6)).join(", ")}]`,
+          ""
+        ]
+      )
+    ]
+      .join(
+        "\n"
+      );
+
+  if (
+    cameraPoses.length > 0
+  ) {
+    drawCameraPosePlot(
+      cameraPoses,
+      aspectRatio
+    );
+  }
 
   $("homographyOutput")
     .classList
@@ -1811,13 +3067,11 @@ function reconstructBook() {
       "hidden"
     );
 
-
   // ========================================================
   // CLEAN MEMORY
   // ========================================================
 
   boundary.delete();
-
   reconstructed.delete();
 
   warpedMats.forEach(
@@ -1827,3 +3081,4 @@ function reconstructBook() {
 
   referencePoints.delete();
 }
+
