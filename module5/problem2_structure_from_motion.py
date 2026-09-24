@@ -4,26 +4,37 @@ Module 5 - Problem 2
 
 Planar Structure from Motion / Multi-View Reconstruction
 
-Four viewpoints of the same planar object.
+Use four viewpoints of the SAME planar object.
 
-For each view:
-C = Capture from camera
-U = Upload image
+Modes:
+1. Camera mode
+   - Capture 4 images one after another
 
-Then click the same four corners:
+2. Upload mode
+   - Select 4 images at the same time
+
+For EVERY image click the same four points in this order:
 
 1. Top Left
 2. Top Right
 3. Bottom Right
 4. Bottom Left
 
-The script:
-- collects four views
-- records pixel coordinates
-- estimates homographies
-- maps all views to a common reference
-- reconstructs the planar object boundary
-- saves camera/view information
+Controls during point selection:
+
+LEFT CLICK = select point
+R          = reset points
+ENTER      = confirm after 4 points
+ESC        = cancel
+
+Outputs:
+- 4 original images
+- 4 images with selected points
+- 4 rectified views
+- reconstructed object
+- reconstructed boundary
+- point coordinates CSV
+- homography matrices
 """
 
 import cv2
@@ -41,28 +52,75 @@ CAMERA_INDEX = 1
 NUMBER_VIEWS = 4
 
 REFERENCE_WIDTH = 600
-
 REFERENCE_HEIGHT = 400
 
 
 # ============================================================
-# CAMERA CAPTURE
+# DISPLAY RESIZE
 # ============================================================
 
-def capture_camera(
-    view_number
+def resize_for_display(
+    image,
+    max_width=1100,
+    max_height=750
 ):
+
+    height, width = image.shape[:2]
+
+    scale = min(
+        1.0,
+        max_width / width,
+        max_height / height
+    )
+
+    if scale == 1.0:
+
+        return image.copy(), 1.0
+
+    resized = cv2.resize(
+        image,
+        (
+            int(width * scale),
+            int(height * scale)
+        ),
+        interpolation=cv2.INTER_AREA
+    )
+
+    return resized, scale
+
+
+# ============================================================
+# CAMERA MODE
+# ============================================================
+
+def capture_four_images():
+
+    images = []
+
+    print()
+    print("=======================================")
+    print("CAMERA MODE")
+    print("=======================================")
+    print()
+    print("You will capture 4 different viewpoints.")
+    print()
+    print("SPACE = capture")
+    print("ESC   = cancel")
+    print()
 
     cap = cv2.VideoCapture(
         CAMERA_INDEX,
         cv2.CAP_AVFOUNDATION
     )
 
-
     if not cap.isOpened():
 
         print(
             "Could not open camera."
+        )
+
+        print(
+            "If needed, try CAMERA_INDEX = 0."
         )
 
         return None
@@ -79,77 +137,123 @@ def capture_camera(
     )
 
 
-    print()
-    print(
-        f"View {view_number}"
-    )
-
-    print(
-        "SPACE = capture"
-    )
-
-    print(
-        "ESC = cancel"
-    )
+    view_number = 1
 
 
-    captured = None
+    while view_number <= NUMBER_VIEWS:
 
+        print()
+        print(
+            f"Prepare View {view_number}"
+        )
 
-    while True:
-
-        ret, frame = cap.read()
-
-
-        if not ret:
-
-            break
-
-
-        display = frame.copy()
-
-
-        cv2.putText(
-            display,
-            f"View {view_number} - SPACE to Capture",
-            (
-                30,
-                50
-            ),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (
-                0,
-                255,
-                0
-            ),
-            2
+        print(
+            "Press SPACE when ready."
         )
 
 
-        cv2.imshow(
-            "Camera",
-            display
-        )
+        captured = False
 
 
-        key = (
-            cv2.waitKey(1)
-            &
-            0xFF
-        )
+        while True:
+
+            ret, frame = cap.read()
 
 
-        if key == 32:
+            if not ret:
 
-            captured = frame.copy()
+                print(
+                    "Could not read camera frame."
+                )
 
-            break
+                cap.release()
+
+                cv2.destroyAllWindows()
+
+                return None
 
 
-        elif key == 27:
+            display = frame.copy()
 
-            break
+
+            cv2.putText(
+                display,
+                f"VIEW {view_number} of 4",
+                (
+                    30,
+                    50
+                ),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (
+                    0,
+                    255,
+                    0
+                ),
+                2
+            )
+
+
+            cv2.putText(
+                display,
+                "SPACE = Capture   ESC = Cancel",
+                (
+                    30,
+                    100
+                ),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (
+                    0,
+                    255,
+                    0
+                ),
+                2
+            )
+
+
+            cv2.imshow(
+                "Camera - Capture Four Views",
+                display
+            )
+
+
+            key = cv2.waitKey(
+                1
+            ) & 0xFF
+
+
+            # SPACE
+            if key == 32:
+
+                images.append(
+                    frame.copy()
+                )
+
+
+                print(
+                    f"View {view_number} captured."
+                )
+
+
+                captured = True
+
+                break
+
+
+            # ESC
+            elif key == 27:
+
+                cap.release()
+
+                cv2.destroyAllWindows()
+
+                return None
+
+
+        if captured:
+
+            view_number += 1
 
 
     cap.release()
@@ -157,152 +261,186 @@ def capture_camera(
     cv2.destroyAllWindows()
 
 
-    return captured
+    print()
+    print(
+        "All 4 camera views captured successfully."
+    )
+
+
+    return images
 
 
 # ============================================================
-# UPLOAD IMAGE
+# UPLOAD MODE
 # ============================================================
 
-def upload_image():
+def upload_four_images():
+
+    print()
+    print("=======================================")
+    print("UPLOAD MODE")
+    print("=======================================")
+    print()
+    print(
+        "Select exactly FOUR images at the same time."
+    )
+    print()
 
     root = Tk()
 
     root.withdraw()
 
+    root.attributes(
+        "-topmost",
+        True
+    )
 
-    path = filedialog.askopenfilename(
-        title="Select View Image",
+
+    paths = filedialog.askopenfilenames(
+
+        title="Select Exactly 4 View Images",
+
         filetypes=[
             (
-                "Images",
-                "*.jpg *.jpeg *.png *.bmp"
+                "Image Files",
+                "*.jpg *.jpeg *.png *.bmp *.JPG *.JPEG *.PNG"
+            ),
+            (
+                "All Files",
+                "*.*"
             )
         ]
+
     )
 
 
     root.destroy()
 
 
-    if not path:
+    if not paths:
+
+        print(
+            "No images selected."
+        )
 
         return None
 
 
-    image = cv2.imread(
-        path
-    )
-
-
-    return image
-
-
-# ============================================================
-# GET IMAGE FOR EACH VIEW
-# ============================================================
-
-def get_view(
-    view_number
-):
-
-    while True:
+    if len(paths) != NUMBER_VIEWS:
 
         print()
         print(
-            "======================================="
+            "ERROR:"
         )
 
         print(
-            f"VIEW {view_number}"
+            f"You selected {len(paths)} images."
         )
 
         print(
-            "======================================="
+            "Please select exactly 4 images."
         )
+
+        return None
+
+
+    images = []
+
+
+    for index, path in enumerate(
+        paths,
+        start=1
+    ):
+
+        image = cv2.imread(
+            path
+        )
+
+
+        if image is None:
+
+            print(
+                "Could not read:",
+                path
+            )
+
+            return None
+
+
+        images.append(
+            image
+        )
+
 
         print(
-            "C = Camera"
-        )
-
-        print(
-            "U = Upload Photo"
+            f"View {index}: {path}"
         )
 
 
-        option = input(
-            "Choose C or U: "
+    print()
+    print(
+        "All 4 images loaded successfully."
+    )
+
+
+    return images
+
+
+# ============================================================
+# CHOOSE INPUT MODE
+# ============================================================
+
+def get_four_views():
+
+    print()
+    print("=======================================")
+    print("STRUCTURE FROM MOTION")
+    print("=======================================")
+
+    print()
+    print(
+        "Choose input method:"
+    )
+
+    print()
+    print(
+        "C = Capture 4 images using camera"
+    )
+
+    print(
+        "U = Upload 4 images"
+    )
+
+
+    while True:
+
+        choice = input(
+            "\nChoose C or U: "
         ).strip().lower()
 
 
-        if option == "c":
+        if choice == "c":
 
-            return capture_camera(
-                view_number
-            )
+            return capture_four_images()
 
 
-        elif option == "u":
+        elif choice == "u":
 
-            return upload_image()
+            return upload_four_images()
 
 
         else:
 
             print(
-                "Invalid option."
+                "Please enter C or U."
             )
-
-
-# ============================================================
-# RESIZE DISPLAY
-# ============================================================
-
-def resize_for_display(
-    image,
-    max_width=1200,
-    max_height=800
-):
-
-    height, width = image.shape[:2]
-
-
-    scale = min(
-
-        1.0,
-
-        max_width / width,
-
-        max_height / height
-
-    )
-
-
-    resized = cv2.resize(
-        image,
-        (
-            int(
-                width * scale
-            ),
-            int(
-                height * scale
-            )
-        ),
-        interpolation=cv2.INTER_AREA
-    )
-
-
-    return (
-        resized,
-        scale
-    )
 
 
 # ============================================================
 # SELECT FOUR CORNERS
 # ============================================================
 
-def select_points(
+def select_four_points(
     image,
     view_number
 ):
@@ -315,7 +453,7 @@ def select_points(
     points = []
 
 
-    names = [
+    corner_names = [
 
         "Top Left",
 
@@ -328,10 +466,14 @@ def select_points(
     ]
 
 
-    window = (
-        f"View {view_number} - Select Corners"
+    window_name = (
+        f"View {view_number} - Select Four Corners"
     )
 
+
+    # --------------------------------------------------------
+    # Mouse Callback
+    # --------------------------------------------------------
 
     def mouse_callback(
         event,
@@ -341,66 +483,82 @@ def select_points(
         param
     ):
 
-        if (
-            event
-            ==
-            cv2.EVENT_LBUTTONDOWN
-        ):
+        if event != cv2.EVENT_LBUTTONDOWN:
 
-            if len(
-                points
-            ) < 4:
-
-                original_x = (
-                    x / scale
-                )
-
-                original_y = (
-                    y / scale
-                )
+            return
 
 
-                points.append(
-                    (
-                        original_x,
-                        original_y
-                    )
-                )
+        if len(points) >= 4:
+
+            return
 
 
-                print(
-                    names[
-                        len(points)
-                        -
-                        1
-                    ],
-                    "=",
-                    (
-                        original_x,
-                        original_y
-                    )
-                )
+        original_x = (
+            x / scale
+        )
 
+        original_y = (
+            y / scale
+        )
+
+
+        points.append(
+            (
+                original_x,
+                original_y
+            )
+        )
+
+
+        index = (
+            len(points) - 1
+        )
+
+
+        print(
+            f"View {view_number} - "
+            f"{corner_names[index]}:"
+        )
+
+        print(
+            f"x = {original_x:.2f}, "
+            f"y = {original_y:.2f}"
+        )
+
+
+    # --------------------------------------------------------
+    # Window
+    # --------------------------------------------------------
 
     cv2.namedWindow(
-        window,
+        window_name,
         cv2.WINDOW_AUTOSIZE
     )
 
 
     cv2.setMouseCallback(
-        window,
+        window_name,
         mouse_callback
     )
 
 
     print()
     print(
+        "======================================="
+    )
+
+    print(
         f"VIEW {view_number}"
     )
 
     print(
-        "Click corners in this order:"
+        "======================================="
+    )
+
+
+    print()
+    print(
+        "Click corners in this EXACT order:"
     )
 
     print(
@@ -420,25 +578,44 @@ def select_points(
     )
 
 
+    print()
+    print(
+        "After selecting all four:"
+    )
+
+    print(
+        "ENTER = confirm"
+    )
+
+    print(
+        "R = reset"
+    )
+
+    print(
+        "ESC = cancel"
+    )
+
+
+    # --------------------------------------------------------
+    # Display Loop
+    # --------------------------------------------------------
+
     while True:
 
         frame = display.copy()
 
 
-        for i, point in enumerate(
+        # Draw selected points
+        for index, point in enumerate(
             points
         ):
 
             px = int(
-                point[0]
-                *
-                scale
+                point[0] * scale
             )
 
             py = int(
-                point[1]
-                *
-                scale
+                point[1] * scale
             )
 
 
@@ -448,7 +625,7 @@ def select_points(
                     px,
                     py
                 ),
-                7,
+                8,
                 (
                     0,
                     0,
@@ -461,14 +638,14 @@ def select_points(
             cv2.putText(
                 frame,
                 str(
-                    i + 1
+                    index + 1
                 ),
                 (
                     px + 10,
-                    py
+                    py - 10
                 ),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
+                0.8,
                 (
                     0,
                     255,
@@ -478,14 +655,11 @@ def select_points(
             )
 
 
-        if len(
-            points
-        ) >= 2:
+        # Draw lines
+        if len(points) >= 2:
 
             for i in range(
-                len(points)
-                -
-                1
+                len(points) - 1
             ):
 
                 p1 = (
@@ -500,6 +674,7 @@ def select_points(
                         scale
                     )
                 )
+
 
                 p2 = (
                     int(
@@ -528,58 +703,193 @@ def select_points(
                 )
 
 
+        # Close polygon when all 4 are selected
+        if len(points) == 4:
+
+            p1 = (
+                int(
+                    points[3][0]
+                    *
+                    scale
+                ),
+                int(
+                    points[3][1]
+                    *
+                    scale
+                )
+            )
+
+
+            p2 = (
+                int(
+                    points[0][0]
+                    *
+                    scale
+                ),
+                int(
+                    points[0][1]
+                    *
+                    scale
+                )
+            )
+
+
+            cv2.line(
+                frame,
+                p1,
+                p2,
+                (
+                    0,
+                    255,
+                    0
+                ),
+                2
+            )
+
+
+        # Instructions
+        cv2.putText(
+            frame,
+            f"View {view_number}/4",
+            (
+                20,
+                35
+            ),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (
+                255,
+                255,
+                0
+            ),
+            2
+        )
+
+
+        cv2.putText(
+            frame,
+            f"Selected: {len(points)}/4",
+            (
+                20,
+                70
+            ),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (
+                255,
+                255,
+                0
+            ),
+            2
+        )
+
+
+        if len(points) < 4:
+
+            next_corner = corner_names[
+                len(points)
+            ]
+
+
+            cv2.putText(
+                frame,
+                f"Next: {next_corner}",
+                (
+                    20,
+                    105
+                ),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (
+                    0,
+                    255,
+                    255
+                ),
+                2
+            )
+
+
+        else:
+
+            cv2.putText(
+                frame,
+                "Press ENTER to confirm",
+                (
+                    20,
+                    105
+                ),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (
+                    0,
+                    255,
+                    0
+                ),
+                2
+            )
+
+
         cv2.imshow(
-            window,
+            window_name,
             frame
         )
 
 
-        key = (
-            cv2.waitKey(20)
-            &
-            0xFF
-        )
+        key = cv2.waitKey(
+            20
+        ) & 0xFF
 
 
-        if (
-            len(points)
-            ==
-            4
-            and
-            key in (
-                13,
-                10
-            )
+        # ENTER
+        if key in (
+            13,
+            10
         ):
 
-            break
+            if len(points) == 4:
+
+                break
 
 
-        if key in (
+        # R
+        elif key in (
             ord("r"),
             ord("R")
         ):
 
             points.clear()
 
+            print()
+            print(
+                f"View {view_number} points reset."
+            )
 
+
+        # ESC
         elif key == 27:
 
             points.clear()
 
-            break
+            cv2.destroyWindow(
+                window_name
+            )
+
+            return None
 
 
     cv2.destroyWindow(
-        window
+        window_name
     )
 
 
-    if len(
-        points
-    ) != 4:
+    # Important on macOS:
+    # process OpenCV window events before
+    # opening the next image.
+    for _ in range(5):
 
-        return None
+        cv2.waitKey(
+            1
+        )
 
 
     return np.array(
@@ -589,10 +899,10 @@ def select_points(
 
 
 # ============================================================
-# DRAW SELECTED BOUNDARY
+# DRAW POINTS ON ORIGINAL IMAGE
 # ============================================================
 
-def draw_boundary(
+def draw_selected_boundary(
     image,
     points,
     view_number
@@ -601,7 +911,7 @@ def draw_boundary(
     output = image.copy()
 
 
-    integer_points = points.astype(
+    pts = points.astype(
         np.int32
     )
 
@@ -609,7 +919,7 @@ def draw_boundary(
     cv2.polylines(
         output,
         [
-            integer_points
+            pts
         ],
         True,
         (
@@ -622,13 +932,25 @@ def draw_boundary(
 
 
     for i, point in enumerate(
-        integer_points
+        pts
     ):
+
+        x = int(
+            point[0]
+        )
+
+        y = int(
+            point[1]
+        )
+
 
         cv2.circle(
             output,
-            tuple(point),
-            8,
+            (
+                x,
+                y
+            ),
+            9,
             (
                 0,
                 0,
@@ -644,15 +966,8 @@ def draw_boundary(
                 i + 1
             ),
             (
-                int(
-                    point[0]
-                )
-                +
-                10,
-
-                int(
-                    point[1]
-                )
+                x + 12,
+                y
             ),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.8,
@@ -672,48 +987,167 @@ def draw_boundary(
 
 
 # ============================================================
+# SAVE POINT COORDINATES
+# ============================================================
+
+def save_coordinates(
+    all_points
+):
+
+    with open(
+        "view_point_coordinates.csv",
+        "w",
+        newline=""
+    ) as file:
+
+        writer = csv.writer(
+            file
+        )
+
+
+        writer.writerow(
+            [
+                "View",
+                "Point",
+                "Corner",
+                "x",
+                "y"
+            ]
+        )
+
+
+        names = [
+
+            "Top Left",
+
+            "Top Right",
+
+            "Bottom Right",
+
+            "Bottom Left"
+
+        ]
+
+
+        for view_index, points in enumerate(
+            all_points,
+            start=1
+        ):
+
+            for point_index, point in enumerate(
+                points,
+                start=1
+            ):
+
+                writer.writerow(
+                    [
+                        view_index,
+
+                        point_index,
+
+                        names[
+                            point_index - 1
+                        ],
+
+                        float(
+                            point[0]
+                        ),
+
+                        float(
+                            point[1]
+                        )
+                    ]
+                )
+
+
+# ============================================================
 # MAIN
 # ============================================================
 
 def main():
 
-    images = []
+    # --------------------------------------------------------
+    # Step 1:
+    # Get all four images FIRST
+    # --------------------------------------------------------
 
-    all_points = []
+    images = get_four_views()
 
 
-    # ========================================================
-    # ACQUIRE FOUR VIEWS
-    # ========================================================
+    if images is None:
 
-    for view in range(
-        1,
-        NUMBER_VIEWS + 1
-    ):
-
-        image = get_view(
-            view
+        print(
+            "No images obtained."
         )
 
+        return
 
-        if image is None:
 
-            print(
-                "Could not obtain view."
-            )
+    if len(images) != 4:
 
-            return
+        print(
+            "Exactly four images are required."
+        )
 
+        return
+
+
+    # --------------------------------------------------------
+    # Save originals
+    # --------------------------------------------------------
+
+    for i, image in enumerate(
+        images,
+        start=1
+    ):
 
         cv2.imwrite(
-            f"view_{view}_original.png",
+            f"view_{i}_original.png",
             image
         )
 
 
-        points = select_points(
-            image,
-            view
+    print()
+    print(
+        "======================================="
+    )
+
+    print(
+        "ALL 4 IMAGES READY"
+    )
+
+    print(
+        "======================================="
+    )
+
+    print()
+    print(
+        "Now select the same four book corners"
+    )
+
+    print(
+        "in all four images."
+    )
+
+
+    # --------------------------------------------------------
+    # Step 2:
+    # Select points
+    # --------------------------------------------------------
+
+    all_points = []
+
+
+    for view_number in range(
+        1,
+        NUMBER_VIEWS + 1
+    ):
+
+        points = select_four_points(
+            images[
+                view_number - 1
+            ],
+            view_number
         )
 
 
@@ -723,19 +1157,9 @@ def main():
                 "Point selection cancelled."
             )
 
+            cv2.destroyAllWindows()
+
             return
-
-
-        draw_boundary(
-            image,
-            points,
-            view
-        )
-
-
-        images.append(
-            image
-        )
 
 
         all_points.append(
@@ -743,9 +1167,33 @@ def main():
         )
 
 
-    # ========================================================
-    # REFERENCE PLANE
-    # ========================================================
+        draw_selected_boundary(
+            images[
+                view_number - 1
+            ],
+            points,
+            view_number
+        )
+
+
+        print()
+        print(
+            f"View {view_number} completed."
+        )
+
+
+    # --------------------------------------------------------
+    # Save coordinates
+    # --------------------------------------------------------
+
+    save_coordinates(
+        all_points
+    )
+
+
+    # --------------------------------------------------------
+    # Reference plane
+    # --------------------------------------------------------
 
     reference_points = np.array(
         [
@@ -756,18 +1204,18 @@ def main():
             ],
 
             [
-                REFERENCE_WIDTH,
+                REFERENCE_WIDTH - 1,
                 0
             ],
 
             [
-                REFERENCE_WIDTH,
-                REFERENCE_HEIGHT
+                REFERENCE_WIDTH - 1,
+                REFERENCE_HEIGHT - 1
             ],
 
             [
                 0,
-                REFERENCE_HEIGHT
+                REFERENCE_HEIGHT - 1
             ]
 
         ],
@@ -780,9 +1228,9 @@ def main():
     warped_images = []
 
 
-    # ========================================================
-    # HOMOGRAPHY FROM EACH VIEW
-    # ========================================================
+    # --------------------------------------------------------
+    # Homography for each view
+    # --------------------------------------------------------
 
     for i in range(
         NUMBER_VIEWS
@@ -822,7 +1270,15 @@ def main():
 
         print()
         print(
-            f"Homography View {i + 1}:"
+            f"======================================="
+        )
+
+        print(
+            f"HOMOGRAPHY MATRIX - VIEW {i + 1}"
+        )
+
+        print(
+            f"======================================="
         )
 
         print(
@@ -830,143 +1286,9 @@ def main():
         )
 
 
-    # ========================================================
-    # COMBINE FOUR RECTIFIED VIEWS
-    # ========================================================
-
-    stack = np.stack(
-        warped_images,
-        axis=0
-    ).astype(
-        np.float32
-    )
-
-
-    average_view = np.mean(
-        stack,
-        axis=0
-    ).astype(
-        np.uint8
-    )
-
-
-    cv2.imwrite(
-        "reconstructed_object.png",
-        average_view
-    )
-
-
-    # ========================================================
-    # DRAW RECONSTRUCTED BOUNDARY
-    # ========================================================
-
-    reconstruction = average_view.copy()
-
-
-    boundary = np.array(
-        [
-
-            [
-                0,
-                0
-            ],
-
-            [
-                REFERENCE_WIDTH - 1,
-                0
-            ],
-
-            [
-                REFERENCE_WIDTH - 1,
-                REFERENCE_HEIGHT - 1
-            ],
-
-            [
-                0,
-                REFERENCE_HEIGHT - 1
-            ]
-
-        ],
-        dtype=np.int32
-    )
-
-
-    cv2.polylines(
-        reconstruction,
-        [
-            boundary
-        ],
-        True,
-        (
-            0,
-            255,
-            0
-        ),
-        5
-    )
-
-
-    cv2.imwrite(
-        "reconstructed_boundary.png",
-        reconstruction
-    )
-
-
-    # ========================================================
-    # SAVE PIXEL COORDINATES
-    # ========================================================
-
-    with open(
-        "view_point_coordinates.csv",
-        "w",
-        newline=""
-    ) as file:
-
-        writer = csv.writer(
-            file
-        )
-
-
-        writer.writerow(
-            [
-                "View",
-                "Point",
-                "x",
-                "y"
-            ]
-        )
-
-
-        for view_index, points in enumerate(
-            all_points,
-            start=1
-        ):
-
-            for point_index, point in enumerate(
-                points,
-                start=1
-            ):
-
-                writer.writerow(
-                    [
-                        view_index,
-
-                        point_index,
-
-                        float(
-                            point[0]
-                        ),
-
-                        float(
-                            point[1]
-                        )
-                    ]
-                )
-
-
-    # ========================================================
-    # SAVE HOMOGRAPHIES
-    # ========================================================
+    # --------------------------------------------------------
+    # Save homographies
+    # --------------------------------------------------------
 
     with open(
         "homography_matrices.txt",
@@ -993,15 +1315,91 @@ def main():
             )
 
 
-    # ========================================================
-    # DISPLAY
-    # ========================================================
+    # --------------------------------------------------------
+    # Average the four rectified views
+    # --------------------------------------------------------
 
-    cv2.imshow(
-        "Reconstructed Object",
-        reconstruction
+    stack = np.stack(
+        warped_images,
+        axis=0
+    ).astype(
+        np.float32
     )
 
+
+    reconstructed = np.mean(
+        stack,
+        axis=0
+    ).astype(
+        np.uint8
+    )
+
+
+    cv2.imwrite(
+        "reconstructed_object.png",
+        reconstructed
+    )
+
+
+    # --------------------------------------------------------
+    # Draw reconstructed boundary
+    # --------------------------------------------------------
+
+    reconstructed_boundary = (
+        reconstructed.copy()
+    )
+
+
+    boundary = np.array(
+        [
+            [
+                0,
+                0
+            ],
+
+            [
+                REFERENCE_WIDTH - 1,
+                0
+            ],
+
+            [
+                REFERENCE_WIDTH - 1,
+                REFERENCE_HEIGHT - 1
+            ],
+
+            [
+                0,
+                REFERENCE_HEIGHT - 1
+            ]
+        ],
+        dtype=np.int32
+    )
+
+
+    cv2.polylines(
+        reconstructed_boundary,
+        [
+            boundary
+        ],
+        True,
+        (
+            0,
+            255,
+            0
+        ),
+        5
+    )
+
+
+    cv2.imwrite(
+        "reconstructed_boundary.png",
+        reconstructed_boundary
+    )
+
+
+    # --------------------------------------------------------
+    # Final results
+    # --------------------------------------------------------
 
     print()
     print(
@@ -1017,32 +1415,101 @@ def main():
     )
 
 
+    print()
     print(
-        "Saved four original images."
+        "Saved:"
+    )
+
+
+    print(
+        "view_1_original.png"
     )
 
     print(
-        "Saved four images with selected points."
+        "view_2_original.png"
     )
 
     print(
-        "Saved four rectified views."
+        "view_3_original.png"
     )
 
     print(
-        "Saved reconstructed_object.png"
+        "view_4_original.png"
+    )
+
+
+    print()
+    print(
+        "view_1_points.png"
     )
 
     print(
-        "Saved reconstructed_boundary.png"
+        "view_2_points.png"
     )
 
     print(
-        "Saved view_point_coordinates.csv"
+        "view_3_points.png"
     )
 
     print(
-        "Saved homography_matrices.txt"
+        "view_4_points.png"
+    )
+
+
+    print()
+    print(
+        "view_1_rectified.png"
+    )
+
+    print(
+        "view_2_rectified.png"
+    )
+
+    print(
+        "view_3_rectified.png"
+    )
+
+    print(
+        "view_4_rectified.png"
+    )
+
+
+    print()
+    print(
+        "view_point_coordinates.csv"
+    )
+
+    print(
+        "homography_matrices.txt"
+    )
+
+    print(
+        "reconstructed_object.png"
+    )
+
+    print(
+        "reconstructed_boundary.png"
+    )
+
+
+    # --------------------------------------------------------
+    # Display reconstruction
+    # --------------------------------------------------------
+
+    display, scale = resize_for_display(
+        reconstructed_boundary
+    )
+
+
+    cv2.imshow(
+        "Final Reconstructed Object Boundary",
+        display
+    )
+
+
+    print()
+    print(
+        "Press any key to close."
     )
 
 

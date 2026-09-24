@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GSU Computer Vision - Module 5</title>
+  <link rel="stylesheet" href="module5.css">
+  <script>
+    // OpenCV.js callback
+    window.Module = {
+      onRuntimeInitialized() {
+        window.cvReady = true;
+        const el = document.getElementById("opencvStatus");
+        if (el) el.textContent = "OpenCV.js ready";
+      }
+    };
+  </script>
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <h1>CSc 8830 Computer Vision</h1>
+    <p>Module 5 - Optical Flow and Planar Structure from Motion</p>
+  </div>
+  <a href="index.html" class="home-link">Back to Modules</a>
+</header>
+
+<main class="page">
+  <section class="hero card">
+    <h2>Module 5</h2>
+    <p>This page runs entirely in the browser and is compatible with a static Vercel deployment.</p>
+    <div id="opencvStatus" class="status">Loading OpenCV.js...</div>
+  </section>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="problem1">Problem 1 - Optical Flow</button>
+    <button class="tab" data-tab="problem2">Problem 2 - Planar Reconstruction</button>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PROBLEM 1 -->
+  <!-- ====================================================== -->
+  <section id="problem1" class="tab-panel active-panel">
+    <div class="card">
+      <h2>Problem 1 - Optical Flow</h2>
+      <p>
+        Two preloaded videos are included. You can also upload another video.
+        The page tracks feature points using pyramidal Lucas-Kanade optical flow
+        and displays motion vectors between consecutive frames.
+      </p>
+
+      <div class="source-row">
+        <button data-video="module5_assets/videos/video1.mp4" class="load-video">Load Preloaded Video 1</button>
+        <button data-video="module5_assets/videos/video2.mp4" class="load-video">Load Preloaded Video 2</button>
+        <label class="upload-label">
+          Upload Video
+          <input id="videoUpload" type="file" accept="video/*" hidden>
+        </label>
+      </div>
+
+      <div class="video-grid">
+        <div>
+          <h3>Source Video</h3>
+          <video id="sourceVideo" controls playsinline crossorigin="anonymous"></video>
+        </div>
+        <div>
+          <h3>Optical Flow Visualization</h3>
+          <canvas id="flowCanvas"></canvas>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="startFlow">Start Optical Flow</button>
+        <button id="stopFlow" class="secondary">Stop</button>
+        <button id="captureValidation" class="secondary">Capture Validation Pair</button>
+      </div>
+
+      <div id="videoInfo" class="info-grid"></div>
+
+      <h3>Tracking Validation</h3>
+      <div class="validation-grid">
+        <canvas id="validation1"></canvas>
+        <canvas id="validation2"></canvas>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Point</th>
+              <th>x1</th>
+              <th>y1</th>
+              <th>x2</th>
+              <th>y2</th>
+              <th>dx</th>
+              <th>dy</th>
+              <th>Magnitude</th>
+            </tr>
+          </thead>
+          <tbody id="validationTable"></tbody>
+        </table>
+      </div>
+
+      <div class="theory">
+        <h3>What optical flow tells us</h3>
+        <p>
+          Optical flow estimates the apparent motion of image points between consecutive frames.
+          The horizontal and vertical components are dx and dy, and the displacement magnitude is
+          sqrt(dx² + dy²). Large vectors indicate stronger image motion while near-zero vectors
+          indicate little or no frame-to-frame motion.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================================================== -->
+  <!-- PROBLEM 2 -->
+  <!-- ====================================================== -->
+  <section id="problem2" class="tab-panel">
+    <div class="card">
+      <h2>Problem 2 - Planar Multi-View Reconstruction</h2>
+      <p>
+        This uses the four-corner homography version of your Python program.
+        Four preloaded book images are included. For each view, click the same four
+        physical corners of the book cover in this order:
+        Top Left, Top Right, Bottom Right, Bottom Left.
+      </p>
+
+      <div class="source-row">
+        <button id="loadBookViews">Load Preloaded Book Images</button>
+        <label class="upload-label">
+          Upload 4 Images
+          <input id="imageUpload" type="file" accept="image/*" multiple hidden>
+        </label>
+        <button id="clearBookViews" class="secondary">Clear</button>
+      </div>
+
+      <div id="bookViews" class="view-grid"></div>
+
+      <div class="controls">
+        <button id="reconstructBook">Reconstruct Planar Object</button>
+      </div>
+
+      <div id="homographyOutput" class="results hidden">
+        <h3>Rectified Views</h3>
+        <div id="rectifiedViews" class="view-grid"></div>
+
+        <h3>Reconstructed Object</h3>
+        <div class="reconstruction-grid">
+          <canvas id="reconstructedCanvas"></canvas>
+          <canvas id="boundaryCanvas"></canvas>
+        </div>
+
+        <h3>Homography Matrices</h3>
+        <pre id="homographyMatrices"></pre>
+
+        <h3>Selected Pixel Coordinates</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>View</th>
+                <th>Point</th>
+                <th>Corner</th>
+                <th>x</th>
+                <th>y</th>
+              </tr>
+            </thead>
+            <tbody id="pointCoordinates"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="module5.js"></script>
+</body>
+</html>
