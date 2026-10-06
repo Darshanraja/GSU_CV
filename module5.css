@@ -147,3 +147,14 @@ pre{
   .video-grid,.validation-grid,.reconstruction-grid,.view-grid,.info-grid{grid-template-columns:1fr}
   .topbar{align-items:flex-start;flex-direction:column}
 }
+
+/* Permanent experiment output gallery */
+.static-results-section{margin-top:22px}
+.static-results-section>h3{margin-top:26px}
+.static-result-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:14px}
+.static-result-card{margin:0;border:1px solid var(--line);border-radius:12px;padding:12px;background:#fafbfd}
+.static-result-card img{display:block;width:100%;height:auto;max-height:850px;object-fit:contain;border-radius:9px;border:1px solid var(--line);background:#fff}
+.static-result-card figcaption{margin-top:10px;color:var(--muted);line-height:1.45;font-size:.95rem}
+.static-result-card.wide-result{grid-column:1 / -1}
+.static-result-card.wide-result img{max-height:none}
+@media(max-width:850px){.static-result-grid{grid-template-columns:1fr}.static-result-card.wide-result{grid-column:auto}}

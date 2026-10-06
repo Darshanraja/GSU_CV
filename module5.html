@@ -173,6 +173,33 @@
       </div>
     </div>
   </section>
+
+  <section class="card static-results-section">
+    <h2>Results Obtained During Experiment</h2>
+    <p>
+      These are saved outputs from the completed Module 5 experiments. They are permanently displayed in the interface so the obtained results can be reviewed without rerunning the optical-flow or reconstruction demos.
+    </p>
+
+    <h3>Problem 1 - Optical Flow Result</h3>
+    <div class="static-result-grid">
+      <figure class="static-result-card wide-result">
+        <img src="module5_results/01_optical_flow_validation.png" alt="Optical flow tracking validation">
+        <figcaption>Figure 1. Optical-flow tracking validation for two consecutive frames. The saved output includes the tracked feature locations and the measured dx, dy, and displacement magnitude for each point.</figcaption>
+      </figure>
+    </div>
+
+    <h3>Problem 2 - Four Viewpoints and Reconstruction</h3>
+    <div class="static-result-grid">
+      <figure class="static-result-card"><img src="module5_results/02_book_view1.png" alt="Book viewpoint 1"><figcaption>Figure 2. View 1 with the four corresponding book-cover corners selected.</figcaption></figure>
+      <figure class="static-result-card"><img src="module5_results/03_book_view2.png" alt="Book viewpoint 2"><figcaption>Figure 3. View 2 with the same four corresponding planar points.</figcaption></figure>
+      <figure class="static-result-card"><img src="module5_results/04_book_view3.png" alt="Book viewpoint 3"><figcaption>Figure 4. View 3 with the selected planar boundary corners.</figcaption></figure>
+      <figure class="static-result-card"><img src="module5_results/05_book_view4.png" alt="Book viewpoint 4"><figcaption>Figure 5. View 4 with the selected planar boundary corners.</figcaption></figure>
+      <figure class="static-result-card wide-result"><img src="module5_results/06_rectified_views.png" alt="Rectified book views"><figcaption>Figure 6. Example rectified views produced by mapping the selected corners to a common planar reference.</figcaption></figure>
+      <figure class="static-result-card wide-result"><img src="module5_results/07_reconstructed_object.png" alt="Reconstructed planar object"><figcaption>Figure 7. Median-fused planar reconstruction and the displayed canonical planar boundary.</figcaption></figure>
+      <figure class="static-result-card wide-result"><img src="module5_results/08_coordinates_camera_poses.png" alt="Selected coordinates and estimated camera poses"><figcaption>Figure 8. Selected pixel coordinates together with the calibrated camera parameters and estimated camera centers for the four viewpoints.</figcaption></figure>
+    </div>
+  </section>
+
 </main>
 
 <script src="module5.js"></script>

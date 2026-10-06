@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Module 3 | Computer Vision Assessment</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="module3_extra.css">
 </head>
 <body>
 <header class="site-header">
@@ -100,6 +101,32 @@
 
   <div id="conclusion" class="info-box">
     Run the experiment to compare the two filtering approaches.
+  </div>
+</section>
+
+
+<section class="cv-card static-results-section">
+  <h3>Results Obtained During Experiment</h3>
+  <p>
+    The images below are saved outputs from the completed experiment. They are shown permanently so the obtained results can be reviewed without rerunning the demo.
+  </p>
+  <div class="static-result-grid">
+    <figure class="static-result-card">
+      <img src="module3_results/01_original.png" alt="Original input image used in Module 3">
+      <figcaption>Figure 1. Original input image used for the spatial-domain and Fourier-domain blur comparison.</figcaption>
+    </figure>
+    <figure class="static-result-card">
+      <img src="module3_results/02_spatial_blur.png" alt="Spatial blur result">
+      <figcaption>Figure 2. Spatial-domain blur result using the 5 x 5 averaging kernel.</figcaption>
+    </figure>
+    <figure class="static-result-card">
+      <img src="module3_results/03_fourier_blur.png" alt="Fourier blur result">
+      <figcaption>Figure 3. Fourier-domain blur result using the same blur kernel.</figcaption>
+    </figure>
+    <figure class="static-result-card wide-result">
+      <img src="module3_results/04_validation.png" alt="Module 3 numerical validation">
+      <figcaption>Figure 4. Numerical validation. MAE = 4.409147e-13, RMSE = 5.625711e-13, and maximum difference = 1.449507e-12, confirming equivalent results within floating-point numerical precision.</figcaption>
+    </figure>
   </div>
 </section>
 

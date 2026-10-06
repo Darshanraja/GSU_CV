@@ -387,6 +387,32 @@
           </p>
         </div>
       </section>
+
+      <section class="cv-card static-results-section">
+        <h3>Results Obtained During Experiment</h3>
+        <p>
+          The following images are saved outputs from the completed RGB and thermal segmentation experiments. These results remain visible on the website even when the interactive demo is not rerun.
+        </p>
+
+        <h4>RGB Human Segmentation Results</h4>
+        <div class="static-result-grid">
+          <figure class="static-result-card"><img src="module4_results/01_rgb_original.png" alt="Original RGB image"><figcaption>Figure 1. Original RGB image used for human segmentation.</figcaption></figure>
+          <figure class="static-result-card"><img src="module4_results/02_rgb_mask.png" alt="RGB body mask"><figcaption>Figure 2. Classical binary whole-body mask generated from the RGB image.</figcaption></figure>
+          <figure class="static-result-card"><img src="module4_results/03_rgb_segmented.png" alt="Segmented RGB human"><figcaption>Figure 3. RGB human isolated using the generated segmentation mask.</figcaption></figure>
+          <figure class="static-result-card"><img src="module4_results/04_rgb_boundary.png" alt="RGB human boundary"><figcaption>Figure 4. Final human boundary overlaid on the original RGB image.</figcaption></figure>
+          <figure class="static-result-card wide-result"><img src="module4_results/05_rgb_comparison.png" alt="RGB classical and SAM2 comparison"><figcaption>Figure 5. Classical mask compared with SAM2. IoU = 0.9939, Dice Score = 0.9970, Precision = 0.9975, and Recall = 0.9964.</figcaption></figure>
+        </div>
+
+        <h4>Thermal Human Segmentation Results</h4>
+        <div class="static-result-grid">
+          <figure class="static-result-card"><img src="module4_results/06_thermal_original.png" alt="Original thermal image"><figcaption>Figure 6. Original thermal image used for human segmentation.</figcaption></figure>
+          <figure class="static-result-card"><img src="module4_results/07_thermal_mask.png" alt="Thermal human mask"><figcaption>Figure 7. Classical human mask generated from the thermal image.</figcaption></figure>
+          <figure class="static-result-card"><img src="module4_results/08_thermal_segmented.png" alt="Segmented thermal human"><figcaption>Figure 8. Segmented human extracted from the thermal image.</figcaption></figure>
+          <figure class="static-result-card"><img src="module4_results/09_thermal_boundary.png" alt="Thermal human boundary"><figcaption>Figure 9. Final thermal human boundary overlaid on the original image.</figcaption></figure>
+          <figure class="static-result-card wide-result"><img src="module4_results/10_thermal_comparison.png" alt="Thermal classical and SAM2 comparison"><figcaption>Figure 10. Classical thermal mask compared with SAM2. IoU = 0.7648, Dice Score = 0.8667, Precision = 0.9944, and Recall = 0.7681.</figcaption></figure>
+        </div>
+      </section>
+
     </main>
 
     <script src="module4.js"></script>
