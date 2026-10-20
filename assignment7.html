@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assignment 7 - Calibrated Stereo Measurement</title>
+  <link rel="stylesheet" href="assignment7.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div>
+      <p class="eyebrow">CSc 8830 Computer Vision</p>
+      <h1>Assignment 7: Calibrated Stereo Measurement</h1>
+      <p class="subtitle">Object-size estimation and room dimensions from a calibrated virtual stereo setup.</p>
+    </div>
+    <a class="back-link" href="index.html">Back to Modules</a>
+  </header>
+
+  <main class="page-shell">
+    <section class="panel intro-panel">
+      <h2>Camera calibration</h2>
+      <p>
+        Enter the calibration values produced by the iPhone calibration step. These values are used for both LEFT and RIGHT views because the same iPhone camera is moved between positions.
+      </p>
+      <div class="calibration-grid">
+        <label>fx<input id="fx" type="number" step="any" value="2301.4244" /></label>
+        <label>fy<input id="fy" type="number" step="any" value="2304.4655" /></label>
+        <label>cx<input id="cx" type="number" step="any" value="973.7959" /></label>
+        <label>cy<input id="cy" type="number" step="any" value="494.0908" /></label>
+        <label>Calibration width<input id="calibWidth" type="number" value="1920" /></label>
+        <label>Calibration height<input id="calibHeight" type="number" value="1080" /></label>
+        <label>k1<input id="k1" type="number" step="any" value="-0.119115207" /></label>
+        <label>k2<input id="k2" type="number" step="any" value="2.47034481" /></label>
+        <label>p1<input id="p1" type="number" step="any" value="-0.0101275808" /></label>
+        <label>p2<input id="p2" type="number" step="any" value="0.00255060451" /></label>
+        <label>k3<input id="k3" type="number" step="any" value="-12.8215409" /></label>
+        <label>Baseline B (cm)<input id="baseline" type="number" step="any" value="15" /></label>
+      </div>
+      <div class="button-row compact-row">
+        <button id="saveCalibration" class="secondary">Save Calibration in Browser</button>
+        <button id="restoreCalibration" class="secondary">Restore Saved Calibration</button>
+      </div>
+      <p class="note">For your final submission, replace the default calibration values above with the new Continuity Camera calibration you obtained.</p>
+    </section>
+
+    <nav class="tabs" aria-label="Assignment sections">
+      <button class="tab-button active" data-tab="problem1">Problem 1 - Object Size</button>
+      <button class="tab-button" data-tab="problem3">Problem 3 - Room Dimension</button>
+    </nav>
+
+    <!-- PROBLEM 1 -->
+    <section id="problem1" class="tab-panel active">
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Problem 1</p>
+            <h2>Calibrated Stereo Object-Size Estimation</h2>
+          </div>
+          <span class="badge">Z first, then physical size</span>
+        </div>
+
+        <div class="control-grid">
+          <label>Input source
+            <select id="p1Source">
+              <option value="preloaded">Preloaded stereo pair</option>
+              <option value="upload">Upload left/right images</option>
+              <option value="camera">Use camera</option>
+            </select>
+          </label>
+          <label>Shape
+            <select id="shapeType">
+              <option value="rectangle">Rectangle</option>
+              <option value="circle">Circle</option>
+              <option value="polygon">Polygon</option>
+            </select>
+          </label>
+          <label id="polygonCountWrap" class="hidden">Polygon vertices
+            <input id="polygonCount" type="number" min="3" max="12" value="5" />
+          </label>
+          <label id="preloadedObjectWrap">Preloaded object
+            <select id="preloadedObject">
+              <option value="speaker">Speaker - Rectangle</option>
+              <option value="circle">Circular object</option>
+              <option value="polygon">TUMS bottle - Polygon</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="uploadControls" class="source-controls hidden">
+          <div class="file-grid">
+            <label>Left image<input id="leftUpload" type="file" accept="image/*" /></label>
+            <label>Right image<input id="rightUpload" type="file" accept="image/*" /></label>
+          </div>
+        </div>
+
+        <div id="cameraControls" class="source-controls hidden">
+          <div class="camera-toolbar">
+            <label>Camera device<select id="cameraSelect"></select></label>
+            <button id="refreshCameras" class="secondary">Refresh Cameras</button>
+            <button id="startCamera">Start Camera</button>
+            <button id="captureLeft">Capture LEFT</button>
+            <button id="captureRight">Capture RIGHT</button>
+            <button id="stopCamera" class="secondary">Stop Camera</button>
+          </div>
+          <video id="cameraPreview" autoplay playsinline muted></video>
+          <p class="note">Capture LEFT, move the camera by the measured baseline while keeping orientation fixed, then capture RIGHT.</p>
+        </div>
+
+        <div class="stereo-grid">
+          <article>
+            <h3>LEFT view</h3>
+            <canvas id="p1LeftCanvas"></canvas>
+            <p id="p1LeftStatus" class="status">Loading...</p>
+          </article>
+          <article>
+            <h3>RIGHT view</h3>
+            <canvas id="p1RightCanvas"></canvas>
+            <p id="p1RightStatus" class="status">Loading...</p>
+          </article>
+        </div>
+
+        <div class="instruction-box">
+          <strong id="pointInstructionTitle">Rectangle point order</strong>
+          <span id="pointInstruction">Click TL, TR, BR, BL on LEFT, then the exact same physical corners in the same order on RIGHT.</span>
+        </div>
+
+        <div class="button-row">
+          <button id="clearP1Points" class="secondary">Clear Points</button>
+          <button id="calculateP1">Calculate Z and Size</button>
+        </div>
+      </section>
+
+      <section id="p1Results" class="panel hidden">
+        <h2>Problem 1 Results</h2>
+        <div class="metric-grid">
+          <div class="metric"><span>Mean disparity</span><strong id="p1MeanDisparity">-</strong></div>
+          <div class="metric"><span>Estimated Z</span><strong id="p1MeanZ">-</strong></div>
+          <div class="metric"><span>Baseline</span><strong id="p1Baseline">-</strong></div>
+          <div class="metric"><span>Scaled fx</span><strong id="p1Fx">-</strong></div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Point</th><th>xL</th><th>yL</th><th>xR</th><th>yR</th><th>d</th><th>X cm</th><th>Y cm</th><th>Z cm</th></tr></thead>
+            <tbody id="p1PointTable"></tbody>
+          </table>
+        </div>
+
+        <div class="result-card">
+          <h3>Estimated physical dimensions</h3>
+          <div id="p1Dimensions"></div>
+        </div>
+      </section>
+    </section>
+
+    <!-- PROBLEM 3 -->
+    <section id="problem3" class="tab-panel">
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Problem 3</p>
+            <h2>Room Dimension from Stereo Videos</h2>
+          </div>
+          <span class="badge">Video input</span>
+        </div>
+
+        <div class="control-grid">
+          <label>Video source
+            <select id="p3Source">
+              <option value="preloaded">Preloaded LEFT / RIGHT videos</option>
+              <option value="upload">Upload LEFT / RIGHT videos</option>
+            </select>
+          </label>
+          <label>Measurement
+            <select id="roomMeasurement">
+              <option value="width">Width</option>
+              <option value="height">Height</option>
+              <option value="length">Length</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="p3UploadControls" class="source-controls hidden">
+          <div class="file-grid">
+            <label>Left video<input id="leftVideoUpload" type="file" accept="video/*,.mov" /></label>
+            <label>Right video<input id="rightVideoUpload" type="file" accept="video/*,.mov" /></label>
+          </div>
+        </div>
+
+        <div class="video-grid">
+          <article>
+            <h3>LEFT video</h3>
+            <video id="leftVideo" controls playsinline preload="metadata"></video>
+            <label>Frame time (seconds)<input id="leftTime" type="range" min="0" max="1" step="0.01" value="0.5" /></label>
+            <span id="leftTimeLabel" class="time-label">0.00 s</span>
+            <button id="captureLeftFrame" class="secondary full-button">Use Current LEFT Frame</button>
+          </article>
+          <article>
+            <h3>RIGHT video</h3>
+            <video id="rightVideo" controls playsinline preload="metadata"></video>
+            <label>Frame time (seconds)<input id="rightTime" type="range" min="0" max="1" step="0.01" value="0.5" /></label>
+            <span id="rightTimeLabel" class="time-label">0.00 s</span>
+            <button id="captureRightFrame" class="secondary full-button">Use Current RIGHT Frame</button>
+          </article>
+        </div>
+
+        <div class="stereo-grid">
+          <article>
+            <h3>Selected LEFT frame</h3>
+            <canvas id="p3LeftCanvas"></canvas>
+            <p id="p3LeftStatus" class="status">Select a frame from the LEFT video.</p>
+          </article>
+          <article>
+            <h3>Selected RIGHT frame</h3>
+            <canvas id="p3RightCanvas"></canvas>
+            <p id="p3RightStatus" class="status">Select a frame from the RIGHT video.</p>
+          </article>
+        </div>
+
+        <div class="instruction-box">
+          <strong id="roomInstructionTitle">Width endpoints</strong>
+          <span id="roomInstruction">Click the left endpoint, then the right endpoint, on both stereo frames.</span>
+        </div>
+
+        <div class="button-row">
+          <button id="clearP3Points" class="secondary">Clear Points</button>
+          <button id="calculateP3">Calculate Room Dimension</button>
+        </div>
+      </section>
+
+      <section id="p3Results" class="panel hidden">
+        <h2>Problem 3 Results</h2>
+        <div class="metric-grid">
+          <div class="metric"><span>Endpoint 1 Z</span><strong id="p3Z1">-</strong></div>
+          <div class="metric"><span>Endpoint 2 Z</span><strong id="p3Z2">-</strong></div>
+          <div class="metric"><span>Estimated dimension</span><strong id="p3DimensionCm">-</strong></div>
+          <div class="metric"><span>Estimated dimension</span><strong id="p3DimensionFt">-</strong></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Point</th><th>d px</th><th>X cm</th><th>Y cm</th><th>Z cm</th></tr></thead>
+            <tbody id="p3PointTable"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer>Assignment 7 - Calibrated virtual stereo using one iPhone at two measured positions.</footer>
+  <script src="assignment7.js"></script>
+</body>
+</html>
