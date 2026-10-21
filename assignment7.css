@@ -76,3 +76,27 @@ footer { text-align: center; color: var(--muted); padding: 25px; font-size: .86r
   .tabs { flex-direction: column; }
   .camera-toolbar { grid-template-columns: 1fr; }
 }
+
+
+/* Problem 1 ground-truth validation */
+.ground-truth-card {
+  margin: 16px 0 2px;
+  padding: 14px 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ground-truth-card > div:first-child { display: flex; flex-direction: column; gap: 3px; }
+.ground-truth-label { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
+#groundTruthValues { text-align: right; color: #243b61; }
+.validation-card { margin-top: 16px; padding: 16px; border-radius: 12px; background: #fffdf5; border: 1px solid #ead7a0; }
+.validation-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.validation-heading h3 { margin: 3px 0 0; }
+@media (max-width: 700px) {
+  .ground-truth-card, .validation-heading { flex-direction: column; align-items: flex-start; }
+  #groundTruthValues { text-align: left; }
+}

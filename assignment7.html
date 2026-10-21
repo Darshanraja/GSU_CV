@@ -86,6 +86,14 @@
           </label>
         </div>
 
+        <div id="groundTruthCard" class="ground-truth-card">
+          <div>
+            <span class="ground-truth-label">Known ground truth</span>
+            <strong id="groundTruthObject">Speaker</strong>
+          </div>
+          <div id="groundTruthValues">Width = 8.00 cm &nbsp;|&nbsp; Height = 9.50 cm</div>
+        </div>
+
         <div id="uploadControls" class="source-controls hidden">
           <div class="file-grid">
             <label>Left image<input id="leftUpload" type="file" accept="image/*" /></label>
@@ -149,6 +157,30 @@
         <div class="result-card">
           <h3>Estimated physical dimensions</h3>
           <div id="p1Dimensions"></div>
+        </div>
+
+        <div id="p1ValidationCard" class="validation-card">
+          <div class="validation-heading">
+            <div>
+              <p class="eyebrow">Validation</p>
+              <h3>Estimated vs. actual dimensions</h3>
+            </div>
+            <span id="p1ValidationObject" class="badge">-</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Measurement</th>
+                  <th>Estimated</th>
+                  <th>Actual</th>
+                  <th>Absolute Error</th>
+                  <th>Error %</th>
+                </tr>
+              </thead>
+              <tbody id="p1ValidationTable"></tbody>
+            </table>
+          </div>
         </div>
       </section>
     </section>

@@ -120,10 +120,119 @@ function pointCanvas(canvasId, statusId, pointColor='#16a34a') {
 const p1Left = pointCanvas('p1LeftCanvas','p1LeftStatus','#16a34a');
 const p1Right = pointCanvas('p1RightCanvas','p1RightStatus','#dc2626');
 const preload = {
-  speaker: {left:'assets/left_speaker.jpg', right:'assets/right_speaker.jpg', shape:'rectangle'},
-  circle: {left:'assets/left_circle.jpg', right:'assets/right_circle.jpg', shape:'circle'},
-  polygon: {left:'assets/left_polygon.jpg', right:'assets/right_polygon.jpg', shape:'polygon'}
+  speaker: {
+    name: 'Speaker',
+    left: 'assets/left_speaker.jpg',
+    right: 'assets/right_speaker.jpg',
+    shape: 'rectangle',
+    actual: { width: 8.0, height: 9.5 }
+  },
+  circle: {
+    name: 'Circular object',
+    left: 'assets/left_circle.jpg',
+    right: 'assets/right_circle.jpg',
+    shape: 'circle',
+    actual: { diameter: 4.0 }
+  },
+  polygon: {
+    name: 'TUMS bottle - Polygon',
+    left: 'assets/left_polygon.jpg',
+    right: 'assets/right_polygon.jpg',
+    shape: 'polygon',
+    actual: { width: 5.5, length: 12.5 }
+  }
 };
+
+function percentError(estimated, actual) {
+  return Math.abs(estimated - actual) / actual * 100;
+}
+
+function updateGroundTruth() {
+  const key = $('preloadedObject').value;
+  const item = preload[key];
+  if (!item) return;
+  $('groundTruthObject').textContent = item.name;
+  if (key === 'speaker') {
+    $('groundTruthValues').innerHTML = 'Width = <strong>8.00 cm</strong> &nbsp;|&nbsp; Height = <strong>9.50 cm</strong>';
+  } else if (key === 'circle') {
+    $('groundTruthValues').innerHTML = 'Diameter = <strong>4.00 cm</strong>';
+  } else {
+    $('groundTruthValues').innerHTML = 'Width = <strong>5.50 cm</strong> &nbsp;|&nbsp; Length = <strong>12.50 cm</strong>';
+  }
+}
+
+// Estimate the two principal dimensions of a planar polygon in 3D.
+// This is used only for validating the preloaded polygon's overall width/length;
+// individual polygon edge lengths are still reported above as required by the assignment.
+function polygonPrincipalDimensions(pts) {
+  if (pts.length < 3) return { width: NaN, length: NaN };
+  const center = {
+    X: avg(pts.map(p => p.X)),
+    Y: avg(pts.map(p => p.Y)),
+    Z: avg(pts.map(p => p.Z))
+  };
+  const centered = pts.map(p => [p.X-center.X, p.Y-center.Y, p.Z-center.Z]);
+
+  // First principal direction by power iteration on the 3x3 covariance matrix.
+  const C = [[0,0,0],[0,0,0],[0,0,0]];
+  centered.forEach(v => {
+    for (let i=0;i<3;i++) for (let j=0;j<3;j++) C[i][j] += v[i]*v[j];
+  });
+  let e1 = [1,0,0];
+  for (let k=0;k<24;k++) {
+    const w = [
+      C[0][0]*e1[0]+C[0][1]*e1[1]+C[0][2]*e1[2],
+      C[1][0]*e1[0]+C[1][1]*e1[1]+C[1][2]*e1[2],
+      C[2][0]*e1[0]+C[2][1]*e1[1]+C[2][2]*e1[2]
+    ];
+    const n = Math.hypot(...w) || 1;
+    e1 = w.map(x => x/n);
+  }
+
+  // Remove the first component and find a second in-plane principal direction.
+  const C2 = C.map((row,i) => row.map((val,j) => {
+    const lambda = e1.reduce((s,x,r)=>s+x*C[r][j],0);
+    return val - lambda*e1[i];
+  }));
+  let e2 = [0,1,0];
+  // Orthogonalize initial vector.
+  let dot = e2[0]*e1[0]+e2[1]*e1[1]+e2[2]*e1[2];
+  e2 = e2.map((x,i)=>x-dot*e1[i]);
+  let en = Math.hypot(...e2);
+  if (en < 1e-8) e2 = [0,0,1]; else e2 = e2.map(x=>x/en);
+  for (let k=0;k<24;k++) {
+    let w = [
+      C2[0][0]*e2[0]+C2[0][1]*e2[1]+C2[0][2]*e2[2],
+      C2[1][0]*e2[0]+C2[1][1]*e2[1]+C2[1][2]*e2[2],
+      C2[2][0]*e2[0]+C2[2][1]*e2[1]+C2[2][2]*e2[2]
+    ];
+    const d = w[0]*e1[0]+w[1]*e1[1]+w[2]*e1[2];
+    w = w.map((x,i)=>x-d*e1[i]);
+    const n = Math.hypot(...w) || 1;
+    e2 = w.map(x=>x/n);
+  }
+
+  const p1 = centered.map(v => v[0]*e1[0]+v[1]*e1[1]+v[2]*e1[2]);
+  const p2 = centered.map(v => v[0]*e2[0]+v[1]*e2[1]+v[2]*e2[2]);
+  const dim1 = Math.max(...p1)-Math.min(...p1);
+  const dim2 = Math.max(...p2)-Math.min(...p2);
+  return { width: Math.min(dim1,dim2), length: Math.max(dim1,dim2) };
+}
+
+function renderValidation(rows, objectName) {
+  $('p1ValidationObject').textContent = objectName;
+  $('p1ValidationTable').innerHTML = rows.map(row => {
+    const absErr = Math.abs(row.estimated - row.actual);
+    const pctErr = percentError(row.estimated, row.actual);
+    return `<tr>
+      <td>${row.label}</td>
+      <td>${row.estimated.toFixed(2)} cm</td>
+      <td>${row.actual.toFixed(2)} cm</td>
+      <td>${absErr.toFixed(2)} cm</td>
+      <td><strong>${pctErr.toFixed(2)}%</strong></td>
+    </tr>`;
+  }).join('');
+}
 function updateShape() {
   const s=$('shapeType').value;
   let n=4, labs=['TL','TR','BR','BL'], close=true, title='Rectangle point order', text='Click TL, TR, BR, BL on LEFT, then the exact same physical corners in the same order on RIGHT.';
@@ -137,6 +246,7 @@ async function loadPreloadedObject() {
   const key=$('preloadedObject').value, item=preload[key];
   $('shapeType').value=item.shape; if(item.shape==='polygon') $('polygonCount').value=8;
   updateShape();
+  updateGroundTruth();
   await Promise.all([p1Left.loadUrl(item.left), p1Right.loadUrl(item.right)]);
 }
 $('shapeType').onchange=updateShape;
@@ -147,6 +257,7 @@ $('p1Source').onchange=async()=>{
   $('uploadControls').classList.toggle('hidden',v!=='upload');
   $('cameraControls').classList.toggle('hidden',v!=='camera');
   $('preloadedObjectWrap').classList.toggle('hidden',v!=='preloaded');
+  $('groundTruthCard').classList.toggle('hidden',v!=='preloaded');
   if(v==='preloaded') await loadPreloadedObject();
 };
 $('leftUpload').onchange=e=>e.target.files[0]&&p1Left.loadFile(e.target.files[0]);
@@ -189,16 +300,51 @@ $('calculateP1').onclick=()=>{
     const labels=$('shapeType').value==='rectangle'?['TL','TR','BR','BL']:$('shapeType').value==='circle'?['D1','D2']:Array.from({length:pts.length},(_,i)=>`P${i+1}`);
     $('p1PointTable').innerHTML=pts.map((p,i)=>`<tr><td>${labels[i]}</td><td>${lp[i].x.toFixed(2)}</td><td>${lp[i].y.toFixed(2)}</td><td>${rp[i].x.toFixed(2)}</td><td>${rp[i].y.toFixed(2)}</td><td>${p.d.toFixed(2)}</td><td>${p.X.toFixed(2)}</td><td>${p.Y.toFixed(2)}</td><td>${p.Z.toFixed(2)}</td></tr>`).join('');
     let html='';
+    let validationRows=[];
+    const objectKey=$('preloadedObject').value;
+    const objectInfo=preload[objectKey];
+
     if($('shapeType').value==='rectangle') {
       if(pts.length!==4) throw new Error('Rectangle requires exactly four points.');
       const top=dist3(pts[0],pts[1]), right=dist3(pts[1],pts[2]), bottom=dist3(pts[3],pts[2]), left=dist3(pts[0],pts[3]);
-      html=`Top edge = <strong>${top.toFixed(2)} cm</strong><br>Bottom edge = <strong>${bottom.toFixed(2)} cm</strong><br>Left edge = <strong>${left.toFixed(2)} cm</strong><br>Right edge = <strong>${right.toFixed(2)} cm</strong><br><br>Estimated width = <strong>${((top+bottom)/2).toFixed(2)} cm</strong><br>Estimated height = <strong>${((left+right)/2).toFixed(2)} cm</strong>`;
+      const estimatedWidth=(top+bottom)/2;
+      const estimatedHeight=(left+right)/2;
+      html=`Top edge = <strong>${top.toFixed(2)} cm</strong><br>Bottom edge = <strong>${bottom.toFixed(2)} cm</strong><br>Left edge = <strong>${left.toFixed(2)} cm</strong><br>Right edge = <strong>${right.toFixed(2)} cm</strong><br><br>Estimated width = <strong>${estimatedWidth.toFixed(2)} cm</strong><br>Estimated height = <strong>${estimatedHeight.toFixed(2)} cm</strong>`;
+      if(objectKey==='speaker') {
+        validationRows=[
+          {label:'Width',estimated:estimatedWidth,actual:8.0},
+          {label:'Height',estimated:estimatedHeight,actual:9.5}
+        ];
+      }
     } else if($('shapeType').value==='circle') {
-      html=`Estimated diameter = <strong>${dist3(pts[0],pts[1]).toFixed(2)} cm</strong>`;
+      const diameter=dist3(pts[0],pts[1]);
+      html=`Estimated diameter = <strong>${diameter.toFixed(2)} cm</strong>`;
+      if(objectKey==='circle') validationRows=[{label:'Diameter',estimated:diameter,actual:4.0}];
     } else {
-      html=''; for(let i=0;i<pts.length;i++){const j=(i+1)%pts.length;html+=`Edge P${i+1}-P${j+1} = <strong>${dist3(pts[i],pts[j]).toFixed(2)} cm</strong><br>`;}
+      html='';
+      for(let i=0;i<pts.length;i++){
+        const j=(i+1)%pts.length;
+        html+=`Edge P${i+1}-P${j+1} = <strong>${dist3(pts[i],pts[j]).toFixed(2)} cm</strong><br>`;
+      }
+      const dims=polygonPrincipalDimensions(pts);
+      html+=`<br>Overall polygon width = <strong>${dims.width.toFixed(2)} cm</strong><br>Overall polygon length = <strong>${dims.length.toFixed(2)} cm</strong>`;
+      if(objectKey==='polygon') {
+        validationRows=[
+          {label:'Width',estimated:dims.width,actual:5.5},
+          {label:'Length',estimated:dims.length,actual:12.5}
+        ];
+      }
     }
-    $('p1Dimensions').innerHTML=html; $('p1Results').classList.remove('hidden');
+
+    $('p1Dimensions').innerHTML=html;
+    if(validationRows.length) {
+      renderValidation(validationRows, objectInfo?.name || 'Object');
+      $('p1ValidationCard').classList.remove('hidden');
+    } else {
+      $('p1ValidationObject').textContent='No reference selected';
+      $('p1ValidationTable').innerHTML='<tr><td colspan="5">Ground-truth error calculation is configured for the three preloaded Assignment 7 objects.</td></tr>';
+    }
+    $('p1Results').classList.remove('hidden');
   } catch(err) { alert(err.message); }
 };
 

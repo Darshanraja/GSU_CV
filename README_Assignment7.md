@@ -57,3 +57,14 @@ The calibration values can be saved in browser local storage with the `Save Cali
 ## GitHub / Vercel
 
 Copy the entire folder contents into the repository, preserving the `assets/` folder. Add a homepage link to `assignment7.html`.
+
+
+## Problem 1 Ground-Truth Validation
+
+The webpage now automatically displays estimated-vs-actual validation for the three preloaded objects:
+
+- Speaker: width 8.0 cm, height 9.5 cm
+- Circular object: diameter 4.0 cm
+- Polygon/TUMS bottle: width 5.5 cm, length 12.5 cm
+
+For each measurement the page reports the estimated value, actual value, absolute error, and percentage error. The polygon view also reports every selected edge plus overall principal width and length for validation.
