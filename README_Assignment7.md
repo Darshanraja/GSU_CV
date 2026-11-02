@@ -68,3 +68,7 @@ The webpage now automatically displays estimated-vs-actual validation for the th
 - Polygon/TUMS bottle: width 5.5 cm, length 12.5 cm
 
 For each measurement the page reports the estimated value, actual value, absolute error, and percentage error. The polygon view also reports every selected edge plus overall principal width and length for validation.
+
+
+## Static result screenshots
+The bottom of `assignment7.html` includes the eight supplied Assignment 7 screenshots from `assets/static_01.png` through `assets/static_08.png`.

@@ -100,3 +100,37 @@ footer { text-align: center; color: var(--muted); padding: 25px; font-size: .86r
   .ground-truth-card, .validation-heading { flex-direction: column; align-items: flex-start; }
   #groundTruthValues { text-align: left; }
 }
+
+
+/* Static Assignment 7 result gallery */
+.static-gallery-panel { margin-top: 24px; }
+.static-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+.static-gallery figure {
+  margin: 0;
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.static-gallery img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: white;
+}
+.static-gallery figcaption {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: .82rem;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .static-gallery { grid-template-columns: 1fr; }
+}
